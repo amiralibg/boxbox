@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import "uplot/dist/uPlot.min.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -21,9 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/poster" className="transition-colors hover:text-fog-100">
                 Posters
               </Link>
-              <span className="cursor-default text-fog-500/60" title="Phase 2">
+              <Link href="/ghost" className="transition-colors hover:text-fog-100">
                 Ghost lab
-              </span>
+              </Link>
               <span className="cursor-default text-fog-500/60" title="Phase 3">
                 Replay
               </span>

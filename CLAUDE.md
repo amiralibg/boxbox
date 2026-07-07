@@ -8,7 +8,30 @@ never relitigate them.
 
 - **Phase 0 (data spikes): DONE.** `spikes/openf1-track-align.ts`, `spikes/duckdb-standings.ts`.
 - **Phase 1 (circuit posters): DONE.** `/poster` route, all 24 2025 circuits, SVG/PNG export.
-- Next: Phase 2 (ghost / lap-delta).
+- **Phase 2 (ghost / lap-delta): DONE.** `/ghost` route.
+- Next: Phase 3 (full replay viewer).
+
+## Phase 2 decisions
+
+- Server bake: `/api/fastlap?session_key&driver_number` fetches laps + location +
+  car_data from OpenF1, resamples to uniform 20 Hz grid (Catmull-Rom positions,
+  linear scalars, hold for gear/DRS), returns `BakedLap` JSON. All OpenF1 calls go
+  through `src/lib/server/openf1.ts` — forever disk cache (`.cache/openf1/`,
+  gitignored) + serialized queue with 400ms gaps. DRS open = raw code >= 10.
+- `TelemetryPlayer` (src/lib/telemetry/player.ts) is a rAF clock with subscriber
+  callbacks — canvas/HUD/chart playheads read it imperatively, zero React re-renders
+  at 60fps. Confirmed 60fps in headless Chromium.
+- Ghost delta (src/lib/telemetry/delta.ts): laps are compared by lap-progress
+  FRACTION, not absolute metres — GPS distance totals differ a few metres per lap;
+  fraction-matching makes delta(finish) exactly equal the lap-time difference.
+  Profile is boxcar-smoothed (window ~2.5% of lap, symmetric + edge-shrinking so
+  endpoints stay exact) because inverting 3.7 Hz-derived distance profiles is jittery.
+- Charts: uPlot small multiples (speed/throttle/brake/delta vs distance), cursor
+  synced via uPlot.sync, playhead drawn in a draw-hook + rAF redraw, click-to-seek.
+  Driver B series is dashed — same-team comparisons keep identity without color.
+  Team colours via `teamColor()` (src/lib/color.ts): normalize OpenF1 bare hex,
+  lift dark colours to luminance ≥ 0.18, `distinctPair()` splits same-team clashes.
+- uPlot CSS imported in root layout (global CSS rule).
 
 ## Phase 1 decisions
 

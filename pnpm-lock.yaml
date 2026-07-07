@@ -23,6 +23,9 @@ importers:
       sharp:
         specifier: ^0.35.3
         version: 0.35.3(@types/node@26.1.0)
+      uplot:
+        specifier: ^1.6.32
+        version: 1.6.32
     devDependencies:
       '@tailwindcss/postcss':
         specifier: ^4.3.2
@@ -1088,6 +1091,9 @@ packages:
   undici-types@8.3.0:
     resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
 
+  uplot@1.6.32:
+    resolution: {integrity: sha512-KIMVnG68zvu5XXUbC4LQEPnhwOxBuLyW1AHtpm6IKTXImkbLgkMy+jabjLgSLMasNuGGzQm/ep3tOkyTxpiQIw==}
+
   wordwrapjs@5.1.1:
     resolution: {integrity: sha512-0yweIbkINJodk27gX9LBGMzyQdBDan3s/dEAiwBOj+Mf0PPyWL6/rikalkv8EeD0E8jm4o5RXEOrFTP3NXbhJg==}
     engines: {node: '>=12.17'}
@@ -1933,5 +1939,7 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici-types@8.3.0: {}
+
+  uplot@1.6.32: {}
 
   wordwrapjs@5.1.1: {}
