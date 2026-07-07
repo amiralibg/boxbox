@@ -1,0 +1,24 @@
+{
+  "name": "boxbox",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "spike:align": "tsx spikes/openf1-track-align.ts",
+    "spike:duckdb": "tsx spikes/duckdb-standings.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.29.3",
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev57.0",
+    "sharp": "^0.35.3"
+  },
+  "private": true
+}

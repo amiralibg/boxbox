@@ -1,0 +1,7 @@
+node_modules/
+spikes/.cache/
+spikes/out/
+.next/
+.env*
+!.env.example
+.DS_Store
