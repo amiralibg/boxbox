@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Space Grotesk";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/space-grotesk.woff2") format("woff2");
+}
+
+@theme {
+  /* charcoal scale, cool-tinted */
+  --color-ink-950: #08080d;
+  --color-ink-900: #0b0b12;
+  --color-ink-800: #12121c;
+  --color-ink-700: #1a1a26;
+  --color-ink-600: #23232f;
+
+  --color-fog-100: #eceaf6;
+  --color-fog-300: #b9b7c9;
+  --color-fog-500: #7e7c92;
+
+  /* neon accents */
+  --color-neon-cyan: #2de2e6;
+  --color-neon-magenta: #ff2d78;
+  --color-neon-violet: #a06cff;
+  --color-neon-amber: #ffb02e;
+  --color-neon-green: #3ff5a0;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+
+html {
+  background: var(--color-ink-950);
+  color: var(--color-fog-100);
+}
+
+body {
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-neon-cyan);
+  color: var(--color-ink-950);
+}

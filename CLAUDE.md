@@ -7,7 +7,25 @@ never relitigate them.
 ## Status
 
 - **Phase 0 (data spikes): DONE.** `spikes/openf1-track-align.ts`, `spikes/duckdb-standings.ts`.
-- Next: Phase 1 (circuit poster tool).
+- **Phase 1 (circuit posters): DONE.** `/poster` route, all 24 2025 circuits, SVG/PNG export.
+- Next: Phase 2 (ghost / lap-delta).
+
+## Phase 1 decisions
+
+- Circuit geometry baked offline via `pnpm bake:circuits [year]` → `public/circuits/*.json`
+  + `index.json` (calendar order = round number). App never calls OpenF1/MultiViewer at
+  runtime for posters.
+- `src/lib/track/geometry.ts` is the TrackRenderer core: `makeProjector()` returns a
+  `project()` that maps raw live-timing coords → screen. Reuse it for car dots in Phase 2 —
+  do NOT write a second projection.
+- Lap length computed from centerline polyline (`lapLengthMeters`), within ~0.5% of official.
+- `Poster.tsx` is a pure self-contained SVG (inline styles only, no CSS classes) because
+  export serializes the DOM node as a standalone file.
+- Export (`src/lib/export.ts` = ExportLayer): Space Grotesk woff2 (self-hosted,
+  `public/fonts/`) is inlined as base64 @font-face into exported SVG/PNG so text renders
+  outside the app. PNG rasterizes via <img> + canvas at 2×.
+- Design tokens in `globals.css` `@theme`: ink (charcoal) / fog (text) / neon accents.
+  Tailwind v4, no config file.
 
 ## Solved: coordinate alignment (Phase 0)
 
