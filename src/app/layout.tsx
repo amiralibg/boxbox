@@ -31,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/numbers" className="transition-colors hover:text-fog-100">
                 The Numbers
               </Link>
+              <Link href="/recap" className="transition-colors hover:text-fog-100">
+                Recap
+              </Link>
             </nav>
           </div>
         </header>

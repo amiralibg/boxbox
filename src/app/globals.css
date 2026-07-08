@@ -45,3 +45,21 @@ body {
   background: var(--color-neon-cyan);
   color: var(--color-ink-950);
 }
+
+/* recap preview: title-arc draw-in (page-only; exports stay static) */
+.recap-host .rc-arc {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: rc-draw 1.5s ease-out forwards;
+}
+@keyframes rc-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .recap-host .rc-arc {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

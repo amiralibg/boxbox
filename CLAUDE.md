@@ -11,7 +11,20 @@ never relitigate them.
 - **Phase 2 (ghost / lap-delta): DONE.** `/ghost` route.
 - **Phase 3 (replay viewer): DONE.** `/replay` route.
 - **Phase 4 (The Numbers): DONE.** `/numbers` route (H2H + what-if tabs).
-- Next: Phase 5 (recap generator).
+- **Phase 5 (recap generator): DONE.** `/recap` route.
+- Next: Phase 6 (stretch — live mode: /api/live SSE + DelayedRestFeed).
+
+## Phase 5 decisions
+
+- `driverSeasonRecap()` (queries.ts) assembles wins/podiums/poles/FLs
+  (polePosition / fastestLap boolean columns), per-round results, and a
+  cumulative-points arc vs the rival (champion, or runner-up if you ARE champion).
+- RecapCard is a pure SVG (1200×675, 16:9) exported through the same ExportLayer
+  as posters. Draw-in animation is page CSS scoped under `.recap-host` targeting
+  `.rc-arc` — deliberately NOT inside the SVG, so exports/PNG rasterization never
+  capture a half-drawn line.
+- Arc end labels get collision nudging when totals are close (2021: 395.5/387.5).
+- DNS rows appear as positionText non-numeric → rendered as DNF ✕; fine for v1.
 
 ## Phase 4 decisions
 

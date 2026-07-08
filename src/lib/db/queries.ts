@@ -118,3 +118,110 @@ export async function seasonMatrix(year: number): Promise<SeasonMatrix> {
     official: official.map((o) => ({ driverId: o.driverId, points: Number(o.points), position: Number(o.position) })),
   };
 }
+
+/* ---------------- Season recap ---------------- */
+
+export interface RecapData {
+  driverId: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  teams: string[];
+  year: number;
+  finalPosition: number | null;
+  points: number;
+  wins: number;
+  podiums: number;
+  poles: number;
+  fastestLaps: number;
+  /** per round: finishing position (null = DNF/DNS), race+sprint points */
+  rounds: { round: number; position: number | null; classified: boolean; points: number }[];
+  /** cumulative points per round, driver + rival */
+  arc: { round: number; self: number; rival: number }[];
+  rivalName: string;
+  rivalPosition: number | null;
+}
+
+export async function seasonDrivers(year: number): Promise<{ id: string; name: string }[]> {
+  return (
+    await q<{ id: string; name: string }>(`
+      SELECT d.id, d.name FROM season_standings s JOIN drivers d ON d.id = s.driverId
+      WHERE s.year = ${year} ORDER BY s.positionDisplayOrder`)
+  ).map((r) => ({ id: r.id, name: r.name }));
+}
+
+export async function driverSeasonRecap(year: number, driverId: string): Promise<RecapData> {
+  const esc = driverId.replace(/'/g, "''");
+  const [summary, teams, roundRows, standing, names] = await Promise.all([
+    q<{ wins: bigint; podiums: bigint; poles: bigint; flaps: bigint }>(`
+      SELECT
+        COUNT(*) FILTER (WHERE positionNumber = 1) AS wins,
+        COUNT(*) FILTER (WHERE positionNumber <= 3) AS podiums,
+        COUNT(*) FILTER (WHERE polePosition) AS poles,
+        COUNT(*) FILTER (WHERE fastestLap) AS flaps
+      FROM race_results WHERE year = ${year} AND driverId = '${esc}'`),
+    q<{ name: string }>(`
+      SELECT DISTINCT c.fullName AS name FROM race_results r JOIN constructors c ON c.id = r.constructorId
+      WHERE r.year = ${year} AND r.driverId = '${esc}'`),
+    q<{ round: number; position: number | null; text: string; pts: number }>(`
+      SELECT r.round AS round, r.positionNumber AS position, r.positionText AS text,
+             COALESCE(r.points, 0) + COALESCE(s.points, 0) AS pts
+      FROM race_results r
+      LEFT JOIN sprint_results s ON s.year = r.year AND s.round = r.round AND s.driverId = r.driverId
+      WHERE r.year = ${year} AND r.driverId = '${esc}' ORDER BY r.round`),
+    q<{ driverId: string; position: number; points: number }>(`
+      SELECT driverId, positionDisplayOrder AS position, points FROM season_standings
+      WHERE year = ${year} ORDER BY positionDisplayOrder LIMIT 3`),
+    q<{ id: string; name: string; firstName: string; lastName: string }>(`
+      SELECT id, name, firstName, lastName FROM drivers`),
+  ]);
+
+  const me = standing.find((s) => s.driverId === driverId);
+  // rival = champion, unless you ARE the champion — then the runner-up
+  const rival = standing.find((s) => s.driverId !== driverId) ?? standing[0];
+  const nameOf = new Map(names.map((n) => [n.id, n]));
+
+  const rivalRounds = await q<{ round: number; pts: number }>(`
+    SELECT r.round AS round, COALESCE(r.points, 0) + COALESCE(s.points, 0) AS pts
+    FROM race_results r
+    LEFT JOIN sprint_results s ON s.year = r.year AND s.round = r.round AND s.driverId = r.driverId
+    WHERE r.year = ${year} AND r.driverId = '${rival.driverId.replace(/'/g, "''")}' ORDER BY r.round`);
+
+  const rounds = roundRows.map((r) => ({
+    round: Number(r.round),
+    position: r.position == null ? null : Number(r.position),
+    classified: /^\d+$/.test(r.text ?? ""),
+    points: Number(r.pts),
+  }));
+
+  const allRounds = [...new Set([...rounds.map((r) => r.round), ...rivalRounds.map((r) => Number(r.round))])].sort((a, b) => a - b);
+  const mineByRound = new Map(rounds.map((r) => [r.round, r.points]));
+  const rivalByRound = new Map(rivalRounds.map((r) => [Number(r.round), Number(r.pts)]));
+  let cs = 0;
+  let cr = 0;
+  const arc = allRounds.map((round) => {
+    cs += mineByRound.get(round) ?? 0;
+    cr += rivalByRound.get(round) ?? 0;
+    return { round, self: cs, rival: cr };
+  });
+
+  const meName = nameOf.get(driverId);
+  return {
+    driverId,
+    name: meName?.name ?? driverId,
+    firstName: meName?.firstName ?? "",
+    lastName: meName?.lastName ?? driverId,
+    teams: teams.map((t) => t.name),
+    year,
+    finalPosition: me ? Number(me.position) : null,
+    points: me ? Number(me.points) : rounds.reduce((a, r) => a + r.points, 0),
+    wins: Number(summary[0]?.wins ?? 0),
+    podiums: Number(summary[0]?.podiums ?? 0),
+    poles: Number(summary[0]?.poles ?? 0),
+    fastestLaps: Number(summary[0]?.flaps ?? 0),
+    rounds,
+    arc,
+    rivalName: nameOf.get(rival.driverId)?.lastName ?? rival.driverId,
+    rivalPosition: Number(rival.position),
+  };
+}
