@@ -25,9 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/ghost" className="transition-colors hover:text-fog-100">
                 Ghost lab
               </Link>
-              <span className="cursor-default text-fog-500/60" title="Phase 3">
+              <Link href="/replay" className="transition-colors hover:text-fog-100">
                 Replay
-              </span>
+              </Link>
               <span className="cursor-default text-fog-500/60" title="Phase 4">
                 The Numbers
               </span>

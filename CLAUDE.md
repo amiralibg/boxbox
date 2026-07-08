@@ -9,7 +9,26 @@ never relitigate them.
 - **Phase 0 (data spikes): DONE.** `spikes/openf1-track-align.ts`, `spikes/duckdb-standings.ts`.
 - **Phase 1 (circuit posters): DONE.** `/poster` route, all 24 2025 circuits, SVG/PNG export.
 - **Phase 2 (ghost / lap-delta): DONE.** `/ghost` route.
-- Next: Phase 3 (full replay viewer).
+- **Phase 3 (replay viewer): DONE.** `/replay` route.
+- Next: Phase 4 (The Numbers — DuckDB-WASM H2H + what-if).
+
+## Phase 3 decisions
+
+- `/api/replay/[sessionKey]` bakes a whole session once to `.cache/replay/{key}.json`
+  (~3.2 MB for a 2h race) and serves it from disk after. Bake = 20 per-driver
+  location fetches (2 Hz resample, int coords) + `position` event list (race order)
+  + `intervals` resampled to 0.25 Hz (gap to leader). First bake ~45s.
+- Race order comes from the `position` endpoint events (authoritative);
+  interval gaps are approximate (4s cadence, lapped cars filtered as strings) —
+  order and gap can look slightly inconsistent for backmarkers; accepted for v1.
+- Intervals only exist for races — quali/practice replays have no gap chart
+  (page hides it).
+- ReplayTrack rebuilds its canvas listener on highlight change (paused canvases
+  don't tick, so highlight must be an effect dep, not a ref — learned the hard way).
+- Gap chart: 20 series, y-inverted (leader top), acronym end-labels instead of a
+  legend box, second teammate dashed, highlight dims others via series.alpha.
+- Playback speeds 1–60×; leaderboard DOM updates throttled to every 2s of session
+  time while playing.
 
 ## Phase 2 decisions
 

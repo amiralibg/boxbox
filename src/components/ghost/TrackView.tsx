@@ -46,6 +46,7 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
 
     const draw = (t: number) => {
       if (!projector || !trackPath) return;
+      const proj = projector;
       ctx.clearRect(0, 0, w, h);
 
       // track bed
@@ -58,7 +59,7 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
       ctx.stroke(trackPath);
 
       // start / finish
-      const [sx, sy] = projector.trackScreen[0];
+      const [sx, sy] = proj.trackScreen[0];
       ctx.fillStyle = "#eceaf6";
       ctx.beginPath();
       ctx.arc(sx, sy, 3, 0, Math.PI * 2);
@@ -76,8 +77,8 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
           if (tb <= 0) break;
           const a = sampleLap(g.lap, ta);
           const b = sampleLap(g.lap, tb);
-          const pa = projector.project([a.x, a.y] as Pt);
-          const pb = projector.project([b.x, b.y] as Pt);
+          const pa = proj.project([a.x, a.y] as Pt);
+          const pb = proj.project([b.x, b.y] as Pt);
           ctx.globalAlpha = 0.55 * (1 - i / steps);
           ctx.beginPath();
           ctx.moveTo(pa[0], pa[1]);
@@ -88,7 +89,7 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
 
         // car dot
         const f = sampleLap(g.lap, t);
-        const [px, py] = projector.project([f.x, f.y] as Pt);
+        const [px, py] = proj.project([f.x, f.y] as Pt);
         ctx.shadowColor = g.color;
         ctx.shadowBlur = 14;
         ctx.fillStyle = g.color;
