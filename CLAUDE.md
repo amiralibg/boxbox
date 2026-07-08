@@ -12,7 +12,27 @@ never relitigate them.
 - **Phase 3 (replay viewer): DONE.** `/replay` route.
 - **Phase 4 (The Numbers): DONE.** `/numbers` route (H2H + what-if tabs).
 - **Phase 5 (recap generator): DONE.** `/recap` route.
-- Next: Phase 6 (stretch — live mode: /api/live SSE + DelayedRestFeed).
+- **Phase 6 (live mode): DONE.** `/live` route. ALL SPEC PHASES COMPLETE.
+
+## Phase 6 decisions
+
+- `LiveFeed` interface in `src/lib/live/types.ts` (frames: t + car xy + optional
+  order/gap updates). Only `DelayedRestFeed` implemented (free tier): polls OpenF1
+  REST every 4s for the window since last poll, one frame per cycle. Live fetches
+  bypass the disk cache deliberately — session data grows while running.
+- `/api/live/[sessionKey]` = SSE. One feed instance per (impl, session, sim-config)
+  fans out to all clients; stops when the last disconnects. 15s heartbeat.
+  `LIVE_FEED` env selects implementation — SignalRFeed / OpenF1StreamFeed (sponsor
+  token, token exchange MUST stay server-side) slot in later.
+- **Simulation mode** (`?simulate=1&speed=N`, N clamped ≤120): virtual clock remaps
+  a historical session to "now" so the identical pipeline is testable outside race
+  weekends. UI has a Simulate toggle.
+- GOTCHA: the starting grid is published with timestamps BEFORE date_start — the
+  first poll must fetch position history unwindowed or the initial order has holes.
+- GOTCHA: OpenF1 sessions endpoint returns the FULL season calendar including
+  future races — filter date_start <= now before offering sessions as "latest".
+- Client smoothing: cars tween linearly from previous to newest position over one
+  poll interval (mutable Map read by rAF loop; no React state on the hot path).
 
 ## Phase 5 decisions
 

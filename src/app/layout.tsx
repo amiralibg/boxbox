@@ -34,6 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/recap" className="transition-colors hover:text-fog-100">
                 Recap
               </Link>
+              <Link href="/live" className="transition-colors hover:text-fog-100">
+                Live
+              </Link>
             </nav>
           </div>
         </header>
