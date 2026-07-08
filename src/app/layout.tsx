@@ -28,9 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/replay" className="transition-colors hover:text-fog-100">
                 Replay
               </Link>
-              <span className="cursor-default text-fog-500/60" title="Phase 4">
+              <Link href="/numbers" className="transition-colors hover:text-fog-100">
                 The Numbers
-              </span>
+              </Link>
             </nav>
           </div>
         </header>

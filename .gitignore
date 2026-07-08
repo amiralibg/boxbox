@@ -6,3 +6,4 @@ spikes/out/
 .env*
 !.env.example
 .DS_Store
+public/duckdb/

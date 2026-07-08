@@ -9,7 +9,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "bake:circuits": "tsx scripts/bake-circuits.ts"
+    "bake:circuits": "tsx scripts/bake-circuits.ts",
+    "postinstall": "mkdir -p public/duckdb && cp node_modules/@duckdb/duckdb-wasm/dist/duckdb-eh.wasm node_modules/@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js public/duckdb/"
   },
   "keywords": [],
   "author": "",

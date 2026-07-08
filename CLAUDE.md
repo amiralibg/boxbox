@@ -10,7 +10,25 @@ never relitigate them.
 - **Phase 1 (circuit posters): DONE.** `/poster` route, all 24 2025 circuits, SVG/PNG export.
 - **Phase 2 (ghost / lap-delta): DONE.** `/ghost` route.
 - **Phase 3 (replay viewer): DONE.** `/replay` route.
-- Next: Phase 4 (The Numbers — DuckDB-WASM H2H + what-if).
+- **Phase 4 (The Numbers): DONE.** `/numbers` route (H2H + what-if tabs).
+- Next: Phase 5 (recap generator).
+
+## Phase 4 decisions
+
+- F1DB CSVs live in `public/f1db/` (7 tables, ~8 MB) and are fetched + registered
+  as DuckDB file buffers in the browser. Views: race_results, sprint_results,
+  quali_results, races, drivers, constructors, season_standings.
+- DuckDB wasm + worker are copied to `public/duckdb/` by the `postinstall` script
+  (gitignored — 36 MB). Browser singleton in `src/lib/db/duckdb.ts` (`getDb()`/`q()`);
+  Arrow returns BigInt for counts — always `Number()` them.
+- H2H pairs: self-join on raceId+constructorId with `driverId <` dedup; pairs with
+  <3 shared rounds dropped (substitute noise). "Rounds" = both classified. Verified
+  2024: VER-PER quali 23-1, NOR-PIA 20-4, points match standings.
+- What-if: DuckDB produces a per-round points matrix once per season; exclusions
+  (cancelled rounds, injected DNFs) recompute in JS instantly. Points-only —
+  countback/ties not modelled (footnote in UI). Verified: 2021 baseline 395.5/387.5;
+  cancelling Abu Dhabi gives 369.5/369.5.
+- H2H bars use fixed cyan/magenta (A/B) — historical team colours don't exist in F1DB.
 
 ## Phase 3 decisions
 

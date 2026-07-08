@@ -13,7 +13,7 @@ import path from "node:path";
 // in the app it'll be AsyncDuckDB + a browser worker, SQL identical.
 import { createDuckDB, NODE_RUNTIME, VoidLogger } from "@duckdb/duckdb-wasm/blocking";
 
-const DATA_DIR = path.join(import.meta.dirname, "..", "data", "f1db");
+const DATA_DIR = path.join(import.meta.dirname, "..", "public", "f1db");
 const DIST = path.join(import.meta.dirname, "..", "node_modules", "@duckdb", "duckdb-wasm", "dist");
 
 async function main() {
