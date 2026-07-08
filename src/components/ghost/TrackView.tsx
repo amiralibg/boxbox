@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit, type Pt } from "@/lib/track/geometry";
 import { sampleLap } from "@/lib/telemetry/sample";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
@@ -44,6 +45,7 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
       trackPath.closePath();
     };
 
+    const headings = new Map<number, number>();
     const draw = (t: number) => {
       if (!projector || !trackPath) return;
       const proj = projector;
@@ -87,25 +89,20 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
         }
         ctx.globalAlpha = 1;
 
-        // car dot
+        // car marker, headed along travel direction
         const f = sampleLap(g.lap, t);
+        const ahead = sampleLap(g.lap, Math.min(t + 0.12, g.lap.lapDuration));
         const [px, py] = proj.project([f.x, f.y] as Pt);
-        ctx.shadowColor = g.color;
-        ctx.shadowBlur = 14;
-        ctx.fillStyle = g.color;
-        ctx.beginPath();
-        ctx.arc(px, py, 6.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = "#0b0b12";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        const [qx, qy] = proj.project([ahead.x, ahead.y] as Pt);
+        const heading = headingBetween(px, py, qx, qy, headings.get(gi) ?? 0);
+        headings.set(gi, heading);
+        drawCar(ctx, px, py, heading, g.color, 1.35, { glow: true });
 
         // label — staggered per ghost so close cars don't overprint
         ctx.font = "600 11px 'Space Grotesk', sans-serif";
         ctx.fillStyle = g.color;
-        const ly = gi % 2 === 0 ? py - 12 : py + 20;
-        ctx.fillText(g.label, px + 11, ly);
+        const ly = gi % 2 === 0 ? py - 16 : py + 24;
+        ctx.fillText(g.label, px + 14, ly);
       });
     };
 

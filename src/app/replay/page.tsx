@@ -3,14 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GapChart } from "@/components/replay/GapChart";
 import { ReplayTrack } from "@/components/replay/ReplayTrack";
+import { LoadingLine, StageSkeleton } from "@/components/ui/Loading";
+import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
+import { Select } from "@/components/ui/Select";
+import { compoundStyle, SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { teamColor } from "@/lib/color";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
-import { gapAt, orderAt, type ReplayBlob } from "@/lib/replay/types";
+import { gapAt, orderAt, type ReplayBlob, type ReplayLap } from "@/lib/replay/types";
 import type { BakedCircuit } from "@/lib/track/geometry";
 import type { SessionInfo } from "@/lib/telemetry/types";
 
-const YEARS = [2023, 2024, 2025];
+const YEARS = [2023, 2024, 2025, 2026];
 const SPEEDS = [1, 5, 15, 30, 60];
 
 const fmtClock = (s: number) => {
@@ -28,7 +32,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function ReplayPage() {
-  const [year, setYear] = useState(2024);
+  const [year, setYear] = useState(2026);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetingKey, setMeetingKey] = useState<number | null>(null);
   const [sessionKey, setSessionKey] = useState<number | null>(null);
@@ -79,36 +83,60 @@ export default function ReplayPage() {
     };
   }, [sessionKey, sessions]);
 
-  const select = "rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-[13px] text-fog-100 outline-none focus-visible:border-fog-500";
-
   return (
-    <main className="mx-auto max-w-7xl px-6 py-8">
-      <h1 className="text-2xl font-bold tracking-tight">Replay</h1>
-      <p className="mt-1.5 text-[13px] text-fog-500">Whole session, every car. First load of a session bakes it (~1 min); after that it's instant.</p>
+    <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
+      <PageTitle index="03" title="Replay" sub="A whole session, every car. First load bakes it from OpenF1 (~1 min), then it's instant." />
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <select className={select} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {YEARS.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <select className={select} value={meetingKey ?? ""} onChange={(e) => { setMeetingKey(Number(e.target.value)); setSessionKey(null); }}>
-          <option value="" disabled>Grand Prix…</option>
-          {meetings.map((m) => (
-            <option key={m.meeting_key} value={m.meeting_key}>{m.circuit_short_name} · {m.country_name}</option>
-          ))}
-        </select>
-        <select className={select} value={sessionKey ?? ""} onChange={(e) => setSessionKey(Number(e.target.value))} disabled={!meetingKey}>
-          <option value="" disabled>Session…</option>
-          {meetingSessions.map((s) => (
-            <option key={s.session_key} value={s.session_key}>{s.session_name}</option>
-          ))}
-        </select>
-        {loading && <span className="animate-pulse text-[13px] text-neon-cyan">Baking session… first time takes a minute</span>}
-      </div>
+      <Panel className="mt-6 p-4 md:p-5">
+        <div className="grid grid-cols-2 gap-3 md:max-w-2xl md:grid-cols-3 md:gap-4">
+          <Select
+            label="SEASON"
+            value={String(year)}
+            onValueChange={(v) => setYear(Number(v))}
+            options={YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+          />
+          <Select
+            label="GRAND PRIX"
+            value={meetingKey ? String(meetingKey) : null}
+            onValueChange={(v) => {
+              setMeetingKey(Number(v));
+              setSessionKey(null);
+            }}
+            placeholder="Choose…"
+            disabled={meetings.length === 0}
+            options={meetings.map((m, i) => ({
+              value: String(m.meeting_key),
+              label: m.circuit_short_name,
+              hint: `R${String(i + 1).padStart(2, "0")} ${m.country_name.toUpperCase().slice(0, 3)}`,
+            }))}
+          />
+          <Select
+            label="SESSION"
+            value={sessionKey ? String(sessionKey) : null}
+            onValueChange={(v) => setSessionKey(Number(v))}
+            placeholder="Choose…"
+            disabled={!meetingKey}
+            options={meetingSessions.map((s) => ({ value: String(s.session_key), label: s.session_name }))}
+          />
+        </div>
+        {loading && (
+          <div className="mt-4">
+            <LoadingLine>Baking session… first time takes about a minute, instant afterwards</LoadingLine>
+          </div>
+        )}
+      </Panel>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-neon-magenta/40 bg-neon-magenta/10 px-3.5 py-2.5 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+      )}
+
+      {loading && !blob && <StageSkeleton label="BAKING SESSION" note="20 CARS · 2 HZ" sidebarRows={12} />}
+
+      {!loading && !blob && !error && (
+        <EmptyState
+          title="No session loaded"
+          hint="Pick a season, grand prix and session above to replay every car — running order, gaps, tyres and lap times included."
+        />
       )}
 
       {blob && circuit && <ReplayStage key={blob.sessionKey} blob={blob} circuit={circuit} />}
@@ -131,7 +159,6 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
     return m;
   }, [blob]);
 
-  // second driver of each team gets a dashed line in the gap chart
   const dashed = useMemo(() => {
     const seen = new Set<string>();
     const dash = new Set<number>();
@@ -149,7 +176,6 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
       if (clockRef.current) clockRef.current.textContent = fmtClock(t);
       if (scrubRef.current) scrubRef.current.value = String(t);
       setPlaying(player.playing);
-      // leaderboard at ~4Hz of wall time is plenty
       if (Math.abs(t - lastBoard) < 2 && player.playing) return;
       lastBoard = t;
       const order = orderAt(blob.order, t);
@@ -158,7 +184,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
         .sort((a, b) => a.pos - b.pos);
       setRows(board);
     });
-    player.seek(60); // skip the empty pre-formation minutes? no — start at t=60s into the session
+    player.seek(60);
     return () => {
       unsub();
       player.destroy();
@@ -173,34 +199,55 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
     });
 
   const byNum = useMemo(() => new Map(blob.drivers.map((d) => [d.num, d])), [blob]);
+  const hasStints = Object.keys(blob.stints ?? {}).length > 0;
+  const totalLaps = useMemo(
+    () => Math.max(1, ...Object.values(blob.stints ?? {}).flat().map((s) => s.lapEnd)),
+    [blob],
+  );
+  // stint rows in final running order when we have it
+  const stintOrder = useMemo(() => {
+    const order = orderAt(blob.order, blob.duration);
+    return [...blob.drivers].sort((a, b) => (order.get(a.num) ?? 99) - (order.get(b.num) ?? 99));
+  }, [blob]);
 
   return (
-    <div className="mt-6">
-      <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div>
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-ink-600/60 bg-ink-900">
-            <ReplayTrack circuit={circuit} blob={blob} colors={colors} player={player} highlight={highlight} />
-          </div>
+    <div className="mt-6 md:mt-8">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <Panel className="overflow-hidden">
+            <div className="flex items-baseline justify-between px-4 pt-4">
+              <SectionLabel>{circuit.name.toUpperCase()} — {blob.sessionName.toUpperCase()}</SectionLabel>
+              <span className="font-mono text-[11px] text-fog-500">{blob.drivers.length} CARS</span>
+            </div>
+            <div className="aspect-[4/3]">
+              <ReplayTrack circuit={circuit} blob={blob} colors={colors} player={player} highlight={highlight} />
+            </div>
+          </Panel>
 
-          <div className="mt-4 rounded-xl border border-ink-600/60 bg-ink-900 p-4">
-            <div className="flex items-center gap-2.5">
+          <Panel className="p-4 md:p-5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => player.toggle()}
-                className="rounded-lg bg-neon-cyan px-4 py-2 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
+                className="chamfer h-9 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
               >
                 {playing ? "Pause" : "Play"}
               </button>
               {SPEEDS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => { player.setSpeed(s); setSpeedState(s); }}
-                  className={`rounded-lg px-2.5 py-1.5 text-[12px] transition-colors ${speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"}`}
+                  onClick={() => {
+                    player.setSpeed(s);
+                    setSpeedState(s);
+                  }}
+                  className={`h-9 px-2.5 font-mono text-[12px] transition-colors ${
+                    speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"
+                  }`}
                 >
                   {s}×
                 </button>
               ))}
-              <span className="ml-auto text-[11px] tracking-[0.15em] text-fog-500">SESSION CLOCK</span>
-              <span ref={clockRef} className="font-mono text-[13px] text-fog-100">0:00:00</span>
+              <span className="ml-auto hidden text-[10px] tracking-[0.2em] text-fog-500 sm:block">SESSION CLOCK</span>
+              <span ref={clockRef} className="font-mono text-[13px] tabular-nums text-fog-100">0:00:00</span>
             </div>
             <input
               ref={scrubRef}
@@ -210,14 +257,14 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               step={1}
               defaultValue={0}
               onInput={(e) => player.seek(Number(e.currentTarget.value))}
-              className="mt-3 w-full accent-neon-cyan"
+              className="mt-3.5 w-full accent-neon-cyan"
             />
-          </div>
+          </Panel>
         </div>
 
-        <div className="max-h-[640px] overflow-y-auto rounded-xl border border-ink-600/60 bg-ink-900">
-          <div className="sticky top-0 border-b border-ink-700/60 bg-ink-900 px-4 py-2.5 text-[11px] tracking-[0.2em] text-fog-500">
-            RUNNING ORDER
+        <Panel className="panel-scroll max-h-[560px] overflow-y-auto lg:max-h-none">
+          <div className="sticky top-0 z-10 border-b border-ink-700/70 bg-ink-900 px-4 py-3">
+            <SectionLabel>RUNNING ORDER</SectionLabel>
           </div>
           {rows.map((r) => {
             const d = byNum.get(r.num);
@@ -227,29 +274,184 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               <button
                 key={r.num}
                 onClick={() => toggleHl(r.num)}
-                className={`flex w-full items-center gap-2.5 border-b border-ink-700/40 px-4 py-2 text-left text-[13px] transition-colors last:border-b-0 ${
+                className={`flex w-full items-center gap-2.5 border-b border-ink-700/40 px-4 py-[7px] text-left transition-colors last:border-b-0 ${
                   active ? "bg-ink-700/70" : "hover:bg-ink-800"
                 }`}
               >
-                <span className="w-6 shrink-0 font-mono text-[11px] text-fog-500">{r.pos}</span>
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.get(r.num) }} />
-                <span className="font-semibold">{d.acronym}</span>
-                <span className="ml-auto font-mono text-[12px] text-fog-300">
+                <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-fog-500">{r.pos}</span>
+                <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: colors.get(r.num) }} />
+                <span className="text-[13px] font-semibold">{d.acronym}</span>
+                <span className="ml-auto font-mono text-[12px] tabular-nums text-fog-300">
                   {r.pos === 1 ? "LEADER" : r.gap != null ? `+${r.gap.toFixed(1)}` : "—"}
                 </span>
               </button>
             );
           })}
-          {rows.length === 0 && <div className="px-4 py-8 text-center text-[13px] text-fog-500">Scrub into the session…</div>}
-        </div>
+          {rows.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-fog-500">Scrub into the session…</div>}
+        </Panel>
       </div>
 
       {Object.keys(blob.gaps).length > 0 && (
-        <div className="mt-6 rounded-xl border border-ink-600/60 bg-ink-900 px-4 pb-3 pt-3">
-          <div className="px-1 pb-2 text-[11px] tracking-[0.18em] text-fog-500">GAP TO LEADER</div>
-          <GapChart blob={blob} colors={colors} dashed={dashed} player={player} highlight={highlight} />
-        </div>
+        <Panel className="mt-5 px-3 pb-3 pt-4 md:px-4">
+          <SectionLabel className="px-1">GAP TO LEADER</SectionLabel>
+          <div className="mt-2">
+            <GapChart blob={blob} colors={colors} dashed={dashed} player={player} highlight={highlight} />
+          </div>
+        </Panel>
+      )}
+
+      {Object.keys(blob.laps ?? {}).length > 0 && <DriverLapsPanel blob={blob} colors={colors} defaultNum={stintOrder[0]?.num} />}
+
+      {hasStints && (
+        <Panel className="mt-5 px-4 pb-4 pt-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <SectionLabel>TYRE STRATEGY</SectionLabel>
+            <div className="flex items-center gap-3 font-mono text-[10px] text-fog-500">
+              {(["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"] as const).map((c) => (
+                <span key={c} className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: compoundStyle(c).color }} />
+                  {compoundStyle(c).letter}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="panel-scroll mt-3 overflow-x-auto">
+            <div className="min-w-[560px] space-y-[5px]">
+              {stintOrder.map((d) => {
+                const stints = blob.stints[d.num];
+                if (!stints || stints.length === 0) return null;
+                return (
+                  <div key={d.num} className="flex items-center gap-2.5">
+                    <span className="w-9 shrink-0 text-right font-mono text-[11px] font-semibold" style={{ color: colors.get(d.num) }}>
+                      {d.acronym}
+                    </span>
+                    <div className="flex h-[18px] flex-1 gap-[2px]">
+                      {stints.map((s, i) => {
+                        const style = compoundStyle(s.compound);
+                        const laps = s.lapEnd - s.lapStart + 1;
+                        return (
+                          <div
+                            key={i}
+                            title={`${s.compound ?? "?"} · L${s.lapStart}–${s.lapEnd}${s.tyreAge ? ` · ${s.tyreAge} laps old` : ""}`}
+                            className="flex items-center justify-center font-mono text-[9px] font-bold text-ink-950"
+                            style={{ width: `${(laps / totalLaps) * 100}%`, backgroundColor: style.color, minWidth: 14 }}
+                          >
+                            {laps >= 4 ? laps : ""}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </Panel>
       )}
     </div>
+  );
+}
+
+const fmtLapTime = (s: number) => {
+  const m = Math.floor(s / 60);
+  return `${m}:${(s - m * 60).toFixed(3).padStart(6, "0")}`;
+};
+
+/**
+ * Lap-by-lap timing sheet for one driver: sector times against session /
+ * personal bests (purple / green), minisector strip, speed trap, tyre.
+ */
+function DriverLapsPanel({ blob, colors, defaultNum }: { blob: ReplayBlob; colors: Map<number, string>; defaultNum?: number }) {
+  const [num, setNum] = useState<number>(defaultNum ?? blob.drivers[0].num);
+  const laps = blob.laps[num] ?? [];
+
+  // session-wide best per sector + best lap, for purple
+  const sessionBest = useMemo(() => {
+    const best: [number, number, number, number] = [Infinity, Infinity, Infinity, Infinity];
+    for (const arr of Object.values(blob.laps)) {
+      for (const l of arr) {
+        l.sectors.forEach((s, i) => {
+          if (s != null && s < best[i]) best[i] = s;
+        });
+        if (l.time != null && l.time < best[3]) best[3] = l.time;
+      }
+    }
+    return best;
+  }, [blob]);
+
+  const personalBest = useMemo(() => {
+    const best: [number, number, number, number] = [Infinity, Infinity, Infinity, Infinity];
+    for (const l of laps) {
+      l.sectors.forEach((s, i) => {
+        if (s != null && s < best[i]) best[i] = s;
+      });
+      if (l.time != null && l.time < best[3]) best[3] = l.time;
+    }
+    return best;
+  }, [laps]);
+
+  const stintFor = (lap: number) => blob.stints[num]?.find((s) => lap >= s.lapStart && lap <= s.lapEnd);
+
+  const tone = (v: number | null, i: number) =>
+    v == null ? "muted" : v <= sessionBest[i] ? "best" : v <= personalBest[i] ? "pb" : "default";
+
+  const rows: TimingRow[] = laps.map((l: ReplayLap) => ({
+    key: String(l.lap),
+    cells: {
+      lap: { text: String(l.lap), tone: "muted" },
+      s1: l.sectors[0] == null ? { text: "—", tone: "muted" } : { text: l.sectors[0].toFixed(3), tone: tone(l.sectors[0], 0) },
+      s2: l.sectors[1] == null ? { text: "—", tone: "muted" } : { text: l.sectors[1].toFixed(3), tone: tone(l.sectors[1], 1) },
+      s3: l.sectors[2] == null ? { text: "—", tone: "muted" } : { text: l.sectors[2].toFixed(3), tone: tone(l.sectors[2], 2) },
+      mini: { text: <SegmentStrip segments={l.segments} /> },
+      time:
+        l.time == null
+          ? { text: l.pitOut ? "OUT LAP" : "—", tone: "muted" }
+          : { text: fmtLapTime(l.time), tone: tone(l.time, 3) },
+      trap: l.trap == null ? { text: "—", tone: "muted" } : { text: String(l.trap), tone: "default" },
+      tyre: {
+        text: (() => {
+          const st = stintFor(l.lap);
+          return st ? <TyreChip compound={st.compound} title={`${st.compound ?? "?"} · fitted L${st.lapStart}`} /> : "—";
+        })(),
+      },
+    },
+  }));
+
+  return (
+    <Panel className="mt-5 pb-1 pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4">
+        <SectionLabel>LAP TIMES — {blob.drivers.find((d) => d.num === num)?.acronym ?? num}</SectionLabel>
+        <div className="flex flex-wrap gap-1">
+          {blob.drivers.map((d) => (
+            <button
+              key={d.num}
+              onClick={() => setNum(d.num)}
+              className={`px-2 py-1 font-mono text-[10px] font-semibold transition-colors ${
+                d.num === num ? "bg-ink-600" : "hover:bg-ink-800"
+              }`}
+              style={{ color: colors.get(d.num) }}
+            >
+              {d.acronym}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="panel-scroll mt-2 max-h-[420px] overflow-y-auto">
+        <TimingTable
+          dense
+          columns={[
+            { key: "lap", header: "LAP", align: "right" },
+            { key: "s1", header: "S1", align: "right" },
+            { key: "s2", header: "S2", align: "right" },
+            { key: "s3", header: "S3", align: "right" },
+            { key: "mini", header: "MINISECTORS" },
+            { key: "time", header: "TIME", align: "right" },
+            { key: "trap", header: "TRAP", align: "right" },
+            { key: "tyre", header: "TYRE", align: "center" },
+          ]}
+          rows={rows}
+        />
+      </div>
+    </Panel>
   );
 }

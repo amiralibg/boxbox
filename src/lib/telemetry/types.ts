@@ -20,6 +20,16 @@ export interface BakedLap {
   gear: number[];
   /** true where DRS open */
   drs: boolean[];
+  /** sector durations of this lap, seconds (null when timing missed one) */
+  sectors: [number | null, number | null, number | null];
+  /** raw minisector codes per sector (2048 yellow / 2049 green / 2051 purple / 2064 pit) */
+  segments: [number[], number[], number[]];
+  /** speed-trap reading km/h, if any */
+  speedTrap: number | null;
+  /** tyre fitted for this lap */
+  compound: string | null;
+  /** tyre age in laps at the start of the stint's best lap */
+  tyreAge: number | null;
 }
 
 export interface SessionInfo {

@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GhostCharts } from "@/components/ghost/GhostCharts";
 import { TrackView, type GhostEntry } from "@/components/ghost/TrackView";
+import { LoadingLine, StageSkeleton } from "@/components/ui/Loading";
+import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
+import { Select } from "@/components/ui/Select";
+import { SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { distinctPair, teamColor } from "@/lib/color";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import { buildDeltaProfile, deltaAt } from "@/lib/telemetry/delta";
@@ -11,7 +15,7 @@ import { sampleLap } from "@/lib/telemetry/sample";
 import type { BakedCircuit } from "@/lib/track/geometry";
 import type { BakedLap, DriverInfo, SessionInfo } from "@/lib/telemetry/types";
 
-const YEARS = [2023, 2024, 2025];
+const YEARS = [2023, 2024, 2025, 2026];
 
 const fmtLap = (s: number) => {
   const m = Math.floor(s / 60);
@@ -26,7 +30,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function GhostPage() {
-  const [year, setYear] = useState(2024);
+  const [year, setYear] = useState(2026);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetingKey, setMeetingKey] = useState<number | null>(null);
   const [sessionKey, setSessionKey] = useState<number | null>(null);
@@ -38,7 +42,6 @@ export default function GhostPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // sessions for the year
   useEffect(() => {
     setSessions([]);
     setMeetingKey(null);
@@ -57,7 +60,6 @@ export default function GhostPage() {
     [sessions, meetingKey],
   );
 
-  // drivers for the session
   useEffect(() => {
     setDrivers([]);
     setNumA(null);
@@ -67,7 +69,6 @@ export default function GhostPage() {
     getJson<DriverInfo[]>(`/api/drivers?session_key=${sessionKey}`).then(setDrivers).catch((e) => setError(String(e)));
   }, [sessionKey]);
 
-  // load both fastest laps + circuit geometry
   useEffect(() => {
     if (!sessionKey || numA == null || numB == null || numA === numB) return;
     const session = sessions.find((s) => s.session_key === sessionKey);
@@ -100,52 +101,84 @@ export default function GhostPage() {
   const driverB = drivers.find((d) => d.driver_number === numB);
   const [colorA, colorB] = distinctPair(teamColor(driverA?.team_colour ?? null), teamColor(driverB?.team_colour ?? null, "#ff2d78"));
 
-  const select = "rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-[13px] text-fog-100 outline-none focus-visible:border-fog-500";
+  const driverOptions = (exclude: number | null) =>
+    drivers.map((d) => ({
+      value: String(d.driver_number),
+      label: d.name_acronym,
+      hint: d.team_name.toUpperCase().slice(0, 14),
+      disabled: d.driver_number === exclude,
+    }));
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-8">
-      <h1 className="text-2xl font-bold tracking-tight">Ghost lab</h1>
-      <p className="mt-1.5 text-[13px] text-fog-500">Two fastest laps, head to head. Pick a session and two drivers.</p>
+    <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
+      <PageTitle index="02" title="Ghost lab" sub="Two fastest laps on one track — sector by sector, corner by corner." />
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <select className={select} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {YEARS.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-        <select className={select} value={meetingKey ?? ""} onChange={(e) => { setMeetingKey(Number(e.target.value)); setSessionKey(null); }}>
-          <option value="" disabled>Grand Prix…</option>
-          {meetings.map((m) => (
-            <option key={m.meeting_key} value={m.meeting_key}>{m.circuit_short_name} · {m.country_name}</option>
-          ))}
-        </select>
-        <select className={select} value={sessionKey ?? ""} onChange={(e) => setSessionKey(Number(e.target.value))} disabled={!meetingKey}>
-          <option value="" disabled>Session…</option>
-          {meetingSessions.map((s) => (
-            <option key={s.session_key} value={s.session_key}>{s.session_name}</option>
-          ))}
-        </select>
-        <select className={select} value={numA ?? ""} onChange={(e) => setNumA(Number(e.target.value))} disabled={drivers.length === 0}>
-          <option value="" disabled>Driver A…</option>
-          {drivers.map((d) => (
-            <option key={d.driver_number} value={d.driver_number} disabled={d.driver_number === numB}>
-              {d.name_acronym} — {d.team_name}
-            </option>
-          ))}
-        </select>
-        <select className={select} value={numB ?? ""} onChange={(e) => setNumB(Number(e.target.value))} disabled={drivers.length === 0}>
-          <option value="" disabled>Driver B…</option>
-          {drivers.map((d) => (
-            <option key={d.driver_number} value={d.driver_number} disabled={d.driver_number === numA}>
-              {d.name_acronym} — {d.team_name}
-            </option>
-          ))}
-        </select>
-        {loading && <span className="text-[13px] text-fog-500">Baking laps…</span>}
-      </div>
+      <Panel className="mt-6 p-4 md:p-5">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
+          <Select
+            label="SEASON"
+            value={String(year)}
+            onValueChange={(v) => setYear(Number(v))}
+            options={YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+          />
+          <Select
+            label="GRAND PRIX"
+            value={meetingKey ? String(meetingKey) : null}
+            onValueChange={(v) => {
+              setMeetingKey(Number(v));
+              setSessionKey(null);
+            }}
+            placeholder="Choose…"
+            disabled={meetings.length === 0}
+            options={meetings.map((m, i) => ({
+              value: String(m.meeting_key),
+              label: m.circuit_short_name,
+              hint: `R${String(i + 1).padStart(2, "0")} ${m.country_name.toUpperCase().slice(0, 3)}`,
+            }))}
+          />
+          <Select
+            label="SESSION"
+            value={sessionKey ? String(sessionKey) : null}
+            onValueChange={(v) => setSessionKey(Number(v))}
+            placeholder="Choose…"
+            disabled={!meetingKey}
+            options={meetingSessions.map((s) => ({ value: String(s.session_key), label: s.session_name }))}
+          />
+          <Select
+            label="DRIVER A"
+            value={numA != null ? String(numA) : null}
+            onValueChange={(v) => setNumA(Number(v))}
+            placeholder="Pick…"
+            disabled={drivers.length === 0}
+            options={driverOptions(numB)}
+          />
+          <Select
+            label="DRIVER B"
+            value={numB != null ? String(numB) : null}
+            onValueChange={(v) => setNumB(Number(v))}
+            placeholder="Pick…"
+            disabled={drivers.length === 0}
+            options={driverOptions(numA)}
+          />
+        </div>
+        {loading && (
+          <div className="mt-4">
+            <LoadingLine>Baking laps from OpenF1… first time for a driver takes a few seconds</LoadingLine>
+          </div>
+        )}
+      </Panel>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-neon-magenta/40 bg-neon-magenta/10 px-3.5 py-2.5 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+      )}
+
+      {loading && !laps && <StageSkeleton label="FASTEST LAPS" note="RESAMPLING TELEMETRY" sidebarRows={6} />}
+
+      {!loading && !laps && !error && (
+        <EmptyState
+          title="No laps on track yet"
+          hint="Pick a season, grand prix and session above, then choose two drivers to race their fastest laps against each other."
+        />
       )}
 
       {laps && circuit && driverA && driverB && (
@@ -208,53 +241,95 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
     [lapA, lapB, colorA, colorB, driverA, driverB],
   );
 
-  const chip = (color: string, d: DriverInfo, lap: BakedLap) => (
-    <div className="flex items-center gap-2.5">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-      <span className="text-[13px] font-semibold">{d.name_acronym}</span>
-      <span className="text-[12px] text-fog-500">{d.team_name}</span>
-      <span className="ml-auto font-mono text-[13px] text-fog-100">{fmtLap(lap.lapDuration)}</span>
-    </div>
-  );
+  // sector comparison rows — green = faster of the pair (relative best)
+  const sectorRows: TimingRow[] = useMemo(() => {
+    const mk = (d: DriverInfo, lap: BakedLap, other: BakedLap, color: string): TimingRow => {
+      const cells: TimingRow["cells"] = {
+        driver: { text: d.name_acronym, color },
+        tyre: {
+          text: (
+            <span className="flex items-center gap-1.5">
+              <TyreChip compound={lap.compound} />
+              {lap.tyreAge != null && <span className="text-fog-500">{lap.tyreAge}L</span>}
+            </span>
+          ),
+        },
+      };
+      lap.sectors.forEach((s, i) => {
+        const o = other.sectors[i];
+        cells[`s${i + 1}`] = s == null
+          ? { text: "—", tone: "muted" }
+          : { text: s.toFixed(3), tone: o != null && s < o ? "pb" : "default" };
+      });
+      cells.lap = { text: fmtLap(lap.lapDuration), tone: lap.lapDuration < other.lapDuration ? "pb" : "default" };
+      cells.trap = lap.speedTrap == null ? { text: "—", tone: "muted" } : {
+        text: `${lap.speedTrap}`,
+        tone: other.speedTrap != null && lap.speedTrap > other.speedTrap ? "pb" : "default",
+      };
+      return { key: d.name_acronym, cells };
+    };
+    return [mk(driverA, lapA, lapB, colorA), mk(driverB, lapB, lapA, colorB)];
+  }, [driverA, driverB, lapA, lapB, colorA, colorB]);
 
   return (
-    <div className="mt-6">
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div className="aspect-[4/3] overflow-hidden rounded-xl border border-ink-600/60 bg-ink-900">
-          <TrackView circuit={circuit} ghosts={ghosts} player={player} />
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <div className="rounded-xl border border-ink-600/60 bg-ink-900 p-5">
-            <div className="text-[11px] tracking-[0.2em] text-fog-500">GAP AT CAR {driverA.name_acronym}</div>
-            <div className="mt-1 font-mono text-5xl font-bold tabular-nums">
-              <span ref={gapRef}>+0.000</span>
-              <span className="ml-1 text-lg text-fog-500">s</span>
-            </div>
-            <div className="mt-4 space-y-2.5">
-              {chip(colorA, driverA, lapA)}
-              {chip(colorB, driverB, lapB)}
-            </div>
+    <div className="mt-6 md:mt-8">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Panel className="min-w-0 overflow-hidden">
+          <div className="flex items-baseline justify-between px-4 pt-4">
+            <SectionLabel>{circuit.name.toUpperCase()} — FASTEST LAPS</SectionLabel>
+            <span className="font-mono text-[11px] text-fog-500">LAP {lapA.lapNumber} / {lapB.lapNumber}</span>
           </div>
+          <div className="aspect-[4/3]">
+            <TrackView circuit={circuit} ghosts={ghosts} player={player} />
+          </div>
+        </Panel>
 
-          <div className="rounded-xl border border-ink-600/60 bg-ink-900 p-5">
-            <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-col gap-5">
+          <Panel className="p-5">
+            <SectionLabel>GAP AT CAR {driverA.name_acronym}</SectionLabel>
+            <div className="mt-2 font-mono text-[52px] font-bold leading-none tabular-nums">
+              <span ref={gapRef}>+0.000</span>
+              <span className="ml-1.5 text-lg font-normal text-fog-500">s</span>
+            </div>
+            <div className="mt-5 space-y-2.5">
+              {[
+                { d: driverA, lap: lapA, color: colorA },
+                { d: driverB, lap: lapB, color: colorB },
+              ].map(({ d, lap, color }) => (
+                <div key={d.driver_number} className="flex items-center gap-2.5">
+                  <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-[13px] font-semibold">{d.name_acronym}</span>
+                  <span className="truncate text-[11px] text-fog-500">{d.team_name}</span>
+                  <span className="ml-auto font-mono text-[13px] tabular-nums">{fmtLap(lap.lapDuration)}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel className="p-5">
+            <SectionLabel>PLAYBACK</SectionLabel>
+            <div className="mt-3.5 flex items-center gap-2">
               <button
                 onClick={() => player.toggle()}
-                className="rounded-lg bg-neon-cyan px-4 py-2 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
+                className="chamfer h-9 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
               >
                 {playing ? "Pause" : "Play"}
               </button>
               {[0.5, 1, 2].map((s) => (
                 <button
                   key={s}
-                  onClick={() => { player.setSpeed(s); setSpeedState(s); }}
-                  className={`rounded-lg px-2.5 py-1.5 text-[12px] transition-colors ${speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"}`}
+                  onClick={() => {
+                    player.setSpeed(s);
+                    setSpeedState(s);
+                  }}
+                  className={`h-9 px-2.5 font-mono text-[12px] transition-colors ${
+                    speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"
+                  }`}
                 >
                   {s}×
                 </button>
               ))}
-              <span ref={clockRef} className="ml-auto font-mono text-[13px] text-fog-300">0:00.000</span>
+              <span ref={clockRef} className="ml-auto font-mono text-[13px] tabular-nums text-fog-300">0:00.000</span>
             </div>
             <input
               ref={scrubRef}
@@ -266,11 +341,44 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
               onInput={(e) => player.seek(Number(e.currentTarget.value))}
               className="mt-4 w-full accent-neon-cyan"
             />
-          </div>
+          </Panel>
+
+          <Panel className="pb-1 pt-4">
+            <SectionLabel className="px-4">SECTORS — BEST LAP</SectionLabel>
+            <div className="mt-2">
+              <TimingTable
+                dense
+                columns={[
+                  { key: "driver", header: "DRV" },
+                  { key: "s1", header: "S1", align: "right" },
+                  { key: "s2", header: "S2", align: "right" },
+                  { key: "s3", header: "S3", align: "right" },
+                  { key: "lap", header: "LAP", align: "right" },
+                  { key: "trap", header: "TRAP", align: "right" },
+                  { key: "tyre", header: "TYRE", align: "center" },
+                ]}
+                rows={sectorRows}
+              />
+            </div>
+            <div className="mt-2 space-y-2 border-t border-ink-700/50 px-3 pb-3 pt-3">
+              {[
+                { d: driverA, lap: lapA, color: colorA },
+                { d: driverB, lap: lapB, color: colorB },
+              ].map(({ d, lap, color }) => (
+                <div key={d.driver_number} className="flex items-center gap-2.5">
+                  <span className="w-8 shrink-0 font-mono text-[10px] font-semibold" style={{ color }}>
+                    {d.name_acronym}
+                  </span>
+                  <SegmentStrip segments={lap.segments} />
+                </div>
+              ))}
+            </div>
+          </Panel>
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-ink-600/60 bg-ink-900 px-4 pb-2 pt-1">
+      <Panel className="mt-5 px-3 pb-2 pt-4 md:px-4">
+        <SectionLabel className="px-1">TELEMETRY — DISTANCE ALIGNED</SectionLabel>
         <GhostCharts
           lapA={lapA}
           lapB={lapB}
@@ -280,7 +388,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
           labelB={driverB.name_acronym}
           player={player}
         />
-      </div>
+      </Panel>
     </div>
   );
 }

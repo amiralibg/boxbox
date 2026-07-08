@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CardsSkeleton, LoadingLine } from "@/components/ui/Loading";
+import { PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
+import { Select } from "@/components/ui/Select";
 import { getDb } from "@/lib/db/duckdb";
 import { seasonMatrix, teammateH2H, type H2HPair, type SeasonMatrix } from "@/lib/db/queries";
 
 const A = "#2de2e6";
 const B = "#ff2d78";
-const YEARS = Array.from({ length: 2025 - 1950 + 1 }, (_, i) => 2025 - i);
+const YEARS = Array.from({ length: 2026 - 1950 + 1 }, (_, i) => 2026 - i);
+const YEAR_OPTIONS = YEARS.map((y) => ({ value: String(y), label: String(y) }));
 
 const pretty = (slug: string) => slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
@@ -23,39 +27,36 @@ export default function NumbersPage() {
   }, []);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-8">
-      <div className="flex items-baseline gap-6">
-        <h1 className="text-2xl font-bold tracking-tight">The Numbers</h1>
-        <nav className="flex gap-1 rounded-lg border border-ink-600/60 bg-ink-900 p-1">
-          {(
-            [
-              ["h2h", "Teammate H2H"],
-              ["whatif", "What-if title fight"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`rounded-md px-3.5 py-1.5 text-[13px] transition-colors ${
-                tab === id ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+    <main className="mx-auto max-w-6xl px-5 py-8 md:px-6 md:py-10">
+      <PageTitle index="04" title="The Numbers" sub="Every season since 1950, queried in your browser. No server involved." />
+
+      <div className="mt-6 flex gap-0 border-b border-ink-700/70">
+        {(
+          [
+            ["h2h", "Teammate H2H"],
+            ["whatif", "What-if title fight"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`relative px-4 py-3 text-[13px] tracking-wide transition-colors ${
+              tab === id ? "text-fog-100" : "text-fog-500 hover:text-fog-300"
+            }`}
+          >
+            {label}
+            {tab === id && <span className="absolute inset-x-4 -bottom-px h-[2px] bg-neon-cyan" />}
+          </button>
+        ))}
       </div>
-      <p className="mt-1.5 text-[13px] text-fog-500">
-        Full 1950–now history, queried in your browser. No server involved.
-      </p>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-neon-magenta/40 bg-neon-magenta/10 px-3.5 py-2.5 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
       )}
       {!ready && !error && (
-        <div className="mt-10 flex items-center gap-3 text-[13px] text-fog-500">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-neon-cyan" />
-          {progress}
+        <div className="mt-8">
+          <LoadingLine>{progress}</LoadingLine>
+          <CardsSkeleton count={4} className="mt-5" />
         </div>
       )}
 
@@ -66,22 +67,22 @@ export default function NumbersPage() {
 
 /* ---------------- Teammate H2H ---------------- */
 
-function SplitBar({ a, b, fmtA, fmtB }: { a: number; b: number; fmtA?: string; fmtB?: string }) {
+function SplitBar({ a, b }: { a: number; b: number }) {
   const total = a + b || 1;
   return (
     <div className="flex items-center gap-3">
-      <span className="w-12 text-right font-mono text-[13px] tabular-nums" style={{ color: A }}>{fmtA ?? a}</span>
-      <div className="flex h-2 flex-1 gap-[2px] overflow-hidden rounded-full bg-ink-700">
-        <div className="rounded-l-full" style={{ width: `${(a / total) * 100}%`, backgroundColor: A }} />
-        <div className="rounded-r-full" style={{ width: `${(b / total) * 100}%`, backgroundColor: B }} />
+      <span className="w-12 text-right font-mono text-[13px] tabular-nums" style={{ color: A }}>{a}</span>
+      <div className="flex h-[6px] flex-1 gap-[2px] bg-ink-700">
+        <div style={{ width: `${(a / total) * 100}%`, backgroundColor: A }} />
+        <div style={{ width: `${(b / total) * 100}%`, backgroundColor: B }} />
       </div>
-      <span className="w-12 font-mono text-[13px] tabular-nums" style={{ color: B }}>{fmtB ?? b}</span>
+      <span className="w-12 font-mono text-[13px] tabular-nums" style={{ color: B }}>{b}</span>
     </div>
   );
 }
 
 function H2HTab() {
-  const [year, setYear] = useState(2024);
+  const [year, setYear] = useState(2025);
   const [pairs, setPairs] = useState<H2HPair[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,45 +93,37 @@ function H2HTab() {
 
   return (
     <div className="mt-6">
-      <select
-        className="rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-[13px] text-fog-100 outline-none"
-        value={year}
-        onChange={(e) => setYear(Number(e.target.value))}
-      >
-        {YEARS.map((y) => (
-          <option key={y} value={y}>{y}</option>
-        ))}
-      </select>
+      <Select label="SEASON" className="w-36" value={String(year)} onValueChange={(v) => setYear(Number(v))} options={YEAR_OPTIONS} />
       {error && <div className="mt-4 text-[13px] text-neon-magenta">{error}</div>}
-      {!pairs && !error && <div className="mt-6 text-[13px] text-fog-500">Crunching…</div>}
+      {!pairs && !error && <CardsSkeleton count={6} className="mt-5" />}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {pairs?.map((p) => (
-          <div key={`${p.constructorId}-${p.driverA}-${p.driverB}`} className="rounded-xl border border-ink-600/60 bg-ink-900 p-5">
-            <div className="flex items-baseline justify-between">
-              <span className="text-[11px] font-medium tracking-[0.2em] text-fog-500">{p.constructorName.toUpperCase()}</span>
-              <span className="text-[11px] text-fog-500">{p.rounds} rounds both classified</span>
+          <Panel key={`${p.constructorId}-${p.driverA}-${p.driverB}`} className="p-5">
+            <div className="flex items-baseline justify-between gap-3">
+              <SectionLabel>{p.constructorName.toUpperCase()}</SectionLabel>
+              <span className="shrink-0 font-mono text-[10px] text-fog-500">{p.rounds} ROUNDS</span>
             </div>
-            <div className="mt-2 flex items-baseline justify-between gap-3">
+            <div className="mt-3 flex items-baseline justify-between gap-3">
               <span className="truncate text-[15px] font-semibold" style={{ color: A }}>{p.nameA}</span>
               <span className="shrink-0 text-[11px] text-fog-500">vs</span>
               <span className="truncate text-right text-[15px] font-semibold" style={{ color: B }}>{p.nameB}</span>
             </div>
             <div className="mt-4 space-y-3">
-              <div>
-                <div className="mb-1 text-[10px] tracking-[0.18em] text-fog-500">QUALIFYING</div>
-                <SplitBar a={p.qualiA} b={p.qualiB} />
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] tracking-[0.18em] text-fog-500">RACE FINISHES</div>
-                <SplitBar a={p.raceA} b={p.raceB} />
-              </div>
-              <div>
-                <div className="mb-1 text-[10px] tracking-[0.18em] text-fog-500">POINTS</div>
-                <SplitBar a={p.pointsA} b={p.pointsB} fmtA={String(p.pointsA)} fmtB={String(p.pointsB)} />
-              </div>
+              {(
+                [
+                  ["QUALIFYING", p.qualiA, p.qualiB],
+                  ["RACE FINISHES", p.raceA, p.raceB],
+                  ["POINTS", p.pointsA, p.pointsB],
+                ] as const
+              ).map(([label, a, b]) => (
+                <div key={label}>
+                  <div className="mb-1 text-[10px] tracking-[0.18em] text-fog-500">{label}</div>
+                  <SplitBar a={a} b={b} />
+                </div>
+              ))}
             </div>
-          </div>
+          </Panel>
         ))}
       </div>
     </div>
@@ -187,30 +180,30 @@ function WhatIfTab() {
     });
 
   const modified = excluded.size > 0 || dnfs.length > 0;
-  const select = "rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-[13px] text-fog-100 outline-none";
 
   return (
     <div className="mt-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <select className={select} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {YEARS.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+      <div className="flex flex-wrap items-end gap-3">
+        <Select label="SEASON" className="w-32" value={String(year)} onValueChange={(v) => setYear(Number(v))} options={YEAR_OPTIONS} />
         {matrix && (
           <>
-            <select className={select} value={dnfDriver} onChange={(e) => setDnfDriver(e.target.value)}>
-              <option value="">DNF a driver…</option>
-              {matrix.drivers.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            <select className={select} value={dnfRound} onChange={(e) => setDnfRound(Number(e.target.value))} disabled={!dnfDriver}>
-              <option value={0}>in round…</option>
-              {matrix.rounds.map((r) => (
-                <option key={r.round} value={r.round}>R{r.round} {pretty(r.name)}</option>
-              ))}
-            </select>
+            <Select
+              label="DNF A DRIVER"
+              className="w-48"
+              value={dnfDriver || null}
+              onValueChange={setDnfDriver}
+              placeholder="Driver…"
+              options={matrix.drivers.map((d) => ({ value: d.id, label: d.name }))}
+            />
+            <Select
+              label="IN ROUND"
+              className="w-48"
+              value={dnfRound ? String(dnfRound) : null}
+              onValueChange={(v) => setDnfRound(Number(v))}
+              placeholder="Round…"
+              disabled={!dnfDriver}
+              options={matrix.rounds.map((r) => ({ value: String(r.round), label: pretty(r.name), hint: `R${r.round}` }))}
+            />
             <button
               disabled={!dnfDriver || !dnfRound}
               onClick={() => {
@@ -218,14 +211,17 @@ function WhatIfTab() {
                 setDnfDriver("");
                 setDnfRound(0);
               }}
-              className="rounded-lg bg-neon-cyan px-3.5 py-2 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+              className="chamfer h-10 bg-neon-cyan px-4 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
             >
               Add DNF
             </button>
             {modified && (
               <button
-                onClick={() => { setExcluded(new Set()); setDnfs([]); }}
-                className="rounded-lg border border-ink-600 px-3.5 py-2 text-[13px] text-fog-300 transition-colors hover:text-fog-100"
+                onClick={() => {
+                  setExcluded(new Set());
+                  setDnfs([]);
+                }}
+                className="h-10 border border-ink-600 px-4 text-[13px] text-fog-300 transition-colors hover:text-fog-100"
               >
                 Reset
               </button>
@@ -235,13 +231,13 @@ function WhatIfTab() {
       </div>
 
       {error && <div className="mt-4 text-[13px] text-neon-magenta">{error}</div>}
-      {!matrix && !error && <div className="mt-6 text-[13px] text-fog-500">Crunching…</div>}
+      {!matrix && !error && <CardsSkeleton count={2} className="mt-6" />}
 
       {matrix && (
-        <div className="mt-5 grid gap-6 lg:grid-cols-[1fr_360px]">
-          <div>
-            <div className="mb-2 text-[11px] tracking-[0.2em] text-fog-500">ROUNDS — CLICK TO CANCEL A RACE</div>
-            <div className="flex flex-wrap gap-1.5">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0">
+            <SectionLabel>ROUNDS — CLICK TO CANCEL A RACE</SectionLabel>
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {matrix.rounds.map((r) => {
                 const off = excluded.has(r.round);
                 return (
@@ -249,27 +245,28 @@ function WhatIfTab() {
                     key={r.round}
                     onClick={() => toggleRound(r.round)}
                     title={pretty(r.name)}
-                    className={`rounded-md border px-2.5 py-1.5 text-[12px] transition-colors ${
+                    className={`border px-2.5 py-1.5 text-[12px] transition-colors ${
                       off
                         ? "border-neon-magenta/50 bg-neon-magenta/10 text-neon-magenta line-through"
                         : "border-ink-600 bg-ink-800 text-fog-300 hover:text-fog-100"
                     }`}
                   >
-                    R{r.round} {pretty(r.name)}
+                    <span className="mr-1.5 font-mono text-[10px] text-fog-500">R{r.round}</span>
+                    {pretty(r.name)}
                   </button>
                 );
               })}
             </div>
 
             {dnfs.length > 0 && (
-              <div className="mt-5">
-                <div className="mb-2 text-[11px] tracking-[0.2em] text-fog-500">INJECTED DNFS</div>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="mt-6">
+                <SectionLabel accent="#ffb02e">INJECTED DNFS</SectionLabel>
+                <div className="mt-3 flex flex-wrap gap-1.5">
                   {dnfs.map((d, i) => (
                     <button
                       key={i}
                       onClick={() => setDnfs((prev) => prev.filter((_, j) => j !== i))}
-                      className="rounded-md border border-neon-amber/50 bg-neon-amber/10 px-2.5 py-1.5 text-[12px] text-neon-amber"
+                      className="border border-neon-amber/50 bg-neon-amber/10 px-2.5 py-1.5 text-[12px] text-neon-amber"
                     >
                       {matrix.drivers.find((x) => x.id === d.driverId)?.name} — R{d.round} ✕
                     </button>
@@ -279,26 +276,37 @@ function WhatIfTab() {
             )}
           </div>
 
-          <div className="rounded-xl border border-ink-600/60 bg-ink-900">
-            <div className="flex items-baseline justify-between border-b border-ink-700/60 px-4 py-2.5">
-              <span className="text-[11px] tracking-[0.2em] text-fog-500">{modified ? "WHAT-IF STANDINGS" : "FINAL STANDINGS"}</span>
-              {modified && <span className="text-[11px] text-neon-amber">modified</span>}
+          <Panel>
+            <div className="flex items-baseline justify-between border-b border-ink-700/70 px-4 py-3">
+              <SectionLabel accent={modified ? "#ffb02e" : "#2de2e6"}>
+                {modified ? "WHAT-IF STANDINGS" : "FINAL STANDINGS"}
+              </SectionLabel>
+              {modified && <span className="font-mono text-[10px] text-neon-amber">MODIFIED</span>}
             </div>
             {standings.slice(0, 12).map((s) => (
-              <div key={s.id} className={`flex items-center gap-3 border-b border-ink-700/40 px-4 py-2 text-[13px] last:border-b-0 ${s.pos === 1 ? "bg-ink-800/60" : ""}`}>
-                <span className="w-5 font-mono text-[11px] text-fog-500">{s.pos}</span>
-                <span className={s.pos === 1 ? "font-bold" : ""}>{s.name}</span>
-                {s.pos === 1 && <span className="text-[10px] tracking-widest text-neon-amber">CHAMPION</span>}
+              <div
+                key={s.id}
+                className={`flex items-center gap-3 border-b border-ink-700/40 px-4 py-2 text-[13px] last:border-b-0 ${
+                  s.pos === 1 ? "bg-ink-800/70" : ""
+                }`}
+              >
+                <span className="w-5 font-mono text-[11px] tabular-nums text-fog-500">{s.pos}</span>
+                <span className={`truncate ${s.pos === 1 ? "font-bold" : ""}`}>{s.name}</span>
+                {s.pos === 1 && <span className="shrink-0 text-[9px] tracking-[0.2em] text-neon-amber">CHAMPION</span>}
                 <span className="ml-auto font-mono tabular-nums">{s.pts}</span>
-                <span className={`w-8 text-right font-mono text-[11px] tabular-nums ${s.delta > 0 ? "text-neon-green" : s.delta < 0 ? "text-neon-magenta" : "text-fog-500"}`}>
+                <span
+                  className={`w-8 text-right font-mono text-[11px] tabular-nums ${
+                    s.delta > 0 ? "text-neon-green" : s.delta < 0 ? "text-neon-magenta" : "text-fog-500"
+                  }`}
+                >
                   {s.delta > 0 ? `▲${s.delta}` : s.delta < 0 ? `▼${-s.delta}` : "·"}
                 </span>
               </div>
             ))}
-            <div className="px-4 py-2 text-[11px] leading-relaxed text-fog-500">
+            <div className="px-4 py-3 text-[11px] leading-relaxed text-fog-500">
               Points only — championship countback (win counts) not modelled; ties keep original standings order.
             </div>
-          </div>
+          </Panel>
         </div>
       )}
     </div>

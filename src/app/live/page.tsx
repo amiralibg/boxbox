@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LiveTrack, type CarTween } from "@/components/live/LiveTrack";
+import { LiveTrack } from "@/components/live/LiveTrack";
+import { LivePlayback } from "@/lib/live/playback";
+import { StageSkeleton } from "@/components/ui/Loading";
+import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
+import { Select } from "@/components/ui/Select";
 import { teamColor } from "@/lib/color";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import type { BakedCircuit } from "@/lib/track/geometry";
@@ -35,7 +39,7 @@ export default function LivePage() {
   const [order, setOrder] = useState<{ num: number; pos: number; gap: number | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const clockRef = useRef<HTMLSpanElement>(null);
-  const tweens = useRef(new Map<number, CarTween>());
+  const playback = useRef<LivePlayback | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   // latest sessions of the current year, newest first
@@ -58,20 +62,20 @@ export default function LivePage() {
   const connect = () => {
     if (!sessionKey) return;
     esRef.current?.close();
-    tweens.current.clear();
     setMeta(null);
     setCircuit(null);
     setOrder([]);
     setError(null);
     setStatus("connecting");
 
+    // clock trails the newest data by ~1.5 poll windows of session time,
+    // so there is always buffered path to glide through
     const pollMs = simulate ? Math.max(1000, 4000 / speed) : 4000;
+    const lagS = 1.5 * (pollMs / 1000) * (simulate ? speed : 1);
+    playback.current = new LivePlayback(simulate ? speed : 1, lagS);
     const url = `/api/live/${sessionKey}${simulate ? `?simulate=1&speed=${speed}` : ""}`;
     const es = new EventSource(url);
     esRef.current = es;
-
-    const gapsRef = new Map<number, number | null>();
-    const posRef = new Map<number, number>();
 
     es.addEventListener("meta", async (e) => {
       const m = JSON.parse((e as MessageEvent).data) as LiveMeta;
@@ -90,29 +94,7 @@ export default function LivePage() {
     });
 
     es.addEventListener("frame", (e) => {
-      const frame = JSON.parse((e as MessageEvent).data) as LiveFrame;
-      const now = performance.now();
-      for (const [numStr, car] of Object.entries(frame.cars)) {
-        const num = Number(numStr);
-        const prev = tweens.current.get(num);
-        const cur = prev
-          ? {
-              x: prev.fromX + (prev.toX - prev.fromX) * Math.min(1, (now - prev.at) / prev.over),
-              y: prev.fromY + (prev.toY - prev.fromY) * Math.min(1, (now - prev.at) / prev.over),
-            }
-          : { x: car.x, y: car.y };
-        tweens.current.set(num, { fromX: cur.x, fromY: cur.y, toX: car.x, toY: car.y, at: now, over: pollMs });
-      }
-      if (clockRef.current) clockRef.current.textContent = fmtClock(frame.t);
-      if (frame.order) for (const o of frame.order) posRef.set(o.num, o.pos);
-      if (frame.gaps) for (const [num, gap] of Object.entries(frame.gaps)) gapsRef.set(Number(num), gap);
-      if (frame.order || frame.gaps) {
-        setOrder(
-          [...posRef]
-            .map(([num, pos]) => ({ num, pos, gap: gapsRef.get(num) ?? null }))
-            .sort((a, b) => a.pos - b.pos),
-        );
-      }
+      playback.current?.addFrame(JSON.parse((e as MessageEvent).data) as LiveFrame);
     });
 
     es.addEventListener("end", () => {
@@ -126,6 +108,32 @@ export default function LivePage() {
 
   useEffect(() => () => esRef.current?.close(), []);
 
+  // leaderboard + clock tick: apply timed order/gap events as playback reaches them
+  useEffect(() => {
+    if (status !== "live") return;
+    const posMap = new Map<number, number>();
+    const gapMap = new Map<number, number | null>();
+    const tick = () => {
+      const pb = playback.current;
+      if (!pb || !pb.hasData) return;
+      const t = pb.now();
+      if (clockRef.current) clockRef.current.textContent = fmtClock(t);
+      const events = pb.drainEvents(t);
+      if (events.length === 0) return;
+      for (const e of events) {
+        if (e.order) for (const o of e.order) posMap.set(o.num, o.pos);
+        if (e.gaps) for (const [num, gap] of Object.entries(e.gaps)) gapMap.set(Number(num), gap);
+      }
+      setOrder(
+        [...posMap]
+          .map(([num, pos]) => ({ num, pos, gap: gapMap.get(num) ?? null }))
+          .sort((a, b) => a.pos - b.pos),
+      );
+    };
+    const id = setInterval(tick, 300);
+    return () => clearInterval(id);
+  }, [status]);
+
   const colors = useMemo(() => {
     const m = new Map<number, string>();
     for (const d of meta?.drivers ?? []) m.set(d.num, teamColor(d.colour));
@@ -133,42 +141,44 @@ export default function LivePage() {
   }, [meta]);
 
   const byNum = useMemo(() => new Map((meta?.drivers ?? []).map((d) => [d.num, d])), [meta]);
-  const select = "rounded-lg border border-ink-600 bg-ink-800 px-3 py-2 text-[13px] text-fog-100 outline-none";
 
   return (
-    <main className="mx-auto max-w-7xl px-6 py-8">
-      <h1 className="text-2xl font-bold tracking-tight">Live</h1>
-      <p className="mt-1.5 text-[13px] text-fog-500">
-        Free-tier delayed feed (~near-live). Simulation replays a finished session through the identical live pipeline.
-      </p>
+    <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
+      <PageTitle index="06" title="Live" sub="Free-tier delayed feed, near-live. Simulation replays a finished session through the identical pipeline." />
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <select className={select} value={sessionKey ?? ""} onChange={(e) => setSessionKey(Number(e.target.value))}>
-          {sessions.slice(0, 40).map((s) => (
-            <option key={s.session_key} value={s.session_key}>
-              {s.circuit_short_name} · {s.session_name} · {s.date_start.slice(0, 10)}
-            </option>
-          ))}
-        </select>
-        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-fog-300">
-          <input type="checkbox" checked={simulate} onChange={(e) => setSimulate(e.target.checked)} className="h-4 w-4 accent-neon-cyan" />
+      <div className="mt-6 flex flex-wrap items-end gap-3">
+        <Select
+          label="SESSION"
+          className="w-full sm:w-72"
+          value={sessionKey ? String(sessionKey) : null}
+          onValueChange={(v) => setSessionKey(Number(v))}
+          options={sessions.slice(0, 40).map((s) => ({
+            value: String(s.session_key),
+            label: `${s.circuit_short_name} · ${s.session_name}`,
+            hint: s.date_start.slice(0, 10),
+          }))}
+        />
+        <label className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-fog-300">
+          <input type="checkbox" checked={simulate} onChange={(e) => setSimulate(e.target.checked)} className="box" />
           Simulate
         </label>
         {simulate && (
-          <select className={select} value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-            {[1, 10, 30, 60].map((s) => (
-              <option key={s} value={s}>{s}× clock</option>
-            ))}
-          </select>
+          <Select
+            label="CLOCK"
+            className="w-28"
+            value={String(speed)}
+            onValueChange={(v) => setSpeed(Number(v))}
+            options={[1, 10, 30, 60].map((s) => ({ value: String(s), label: `${s}×` }))}
+          />
         )}
         <button
           onClick={connect}
           disabled={!sessionKey || status === "connecting"}
-          className="rounded-lg bg-neon-cyan px-4 py-2 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+          className="chamfer h-10 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
         >
           {status === "connecting" ? "Connecting…" : status === "live" ? "Reconnect" : "Connect"}
         </button>
-        <span className="ml-auto flex items-center gap-2 text-[13px] text-fog-500">
+        <span className="flex h-10 items-center gap-2 text-[13px] text-fog-500 md:ml-auto">
           {status === "live" && <span className="h-2 w-2 animate-pulse rounded-full bg-neon-green" />}
           {status === "ended" && <span className="h-2 w-2 rounded-full bg-fog-500" />}
           {status === "live" ? "LIVE" : status === "ended" ? "SESSION ENDED" : status.toUpperCase()}
@@ -177,25 +187,39 @@ export default function LivePage() {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-neon-magenta/40 bg-neon-magenta/10 px-3.5 py-2.5 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+      )}
+
+      {status === "connecting" && <StageSkeleton label="CONNECTING FEED" note="SSE" sidebarRows={10} />}
+
+      {status === "idle" && !error && (
+        <EmptyState
+          title="Feed not connected"
+          hint="Pick a session and hit Connect. Simulate replays a finished session as if it were live — crank the clock to fast-forward."
+        />
       )}
 
       {meta && circuit && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
-          <div className="aspect-[4/3] overflow-hidden rounded-xl border border-ink-600/60 bg-ink-900">
-            <LiveTrack circuit={circuit} meta={meta} colors={colors} tweens={tweens} />
-          </div>
-          <div className="max-h-[640px] overflow-y-auto rounded-xl border border-ink-600/60 bg-ink-900">
-            <div className="sticky top-0 border-b border-ink-700/60 bg-ink-900 px-4 py-2.5 text-[11px] tracking-[0.2em] text-fog-500">
-              RUNNING ORDER
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <Panel className="min-w-0 overflow-hidden">
+            <div className="px-4 pt-4">
+              <SectionLabel accent="#3ff5a0">{meta.sessionName.toUpperCase()} — DELAYED REST FEED</SectionLabel>
+            </div>
+            <div className="aspect-[4/3]">
+              <LiveTrack circuit={circuit} meta={meta} colors={colors} playback={playback} />
+            </div>
+          </Panel>
+          <Panel className="panel-scroll max-h-[640px] overflow-y-auto">
+            <div className="sticky top-0 z-10 border-b border-ink-700/70 bg-ink-900 px-4 py-3">
+              <SectionLabel accent="#3ff5a0">RUNNING ORDER</SectionLabel>
             </div>
             {order.map((r) => {
               const d = byNum.get(r.num);
               if (!d) return null;
               return (
-                <div key={r.num} className="flex items-center gap-2.5 border-b border-ink-700/40 px-4 py-2 text-[13px] last:border-b-0">
-                  <span className="w-6 shrink-0 font-mono text-[11px] text-fog-500">{r.pos}</span>
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors.get(r.num) }} />
+                <div key={r.num} className="flex items-center gap-2.5 border-b border-ink-700/40 px-4 py-[7px] text-[13px] last:border-b-0">
+                  <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-fog-500">{r.pos}</span>
+                  <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: colors.get(r.num) }} />
                   <span className="font-semibold">{d.acronym}</span>
                   <span className="ml-auto font-mono text-[12px] text-fog-300">
                     {r.pos === 1 ? "LEADER" : r.gap != null ? `+${r.gap.toFixed(1)}` : "—"}
@@ -203,8 +227,8 @@ export default function LivePage() {
                 </div>
               );
             })}
-            {order.length === 0 && <div className="px-4 py-8 text-center text-[13px] text-fog-500">Waiting for timing data…</div>}
-          </div>
+            {order.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-fog-500">Waiting for timing data…</div>}
+          </Panel>
         </div>
       )}
     </main>

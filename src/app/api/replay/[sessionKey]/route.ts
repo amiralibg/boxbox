@@ -22,10 +22,32 @@ interface PositionRow {
   position: number;
 }
 
+interface StintRow {
+  driver_number: number;
+  compound: string | null;
+  lap_start: number;
+  lap_end: number;
+  tyre_age_at_start: number | null;
+}
+
 interface IntervalRow {
   date: string;
   driver_number: number;
   gap_to_leader: number | string | null;
+}
+
+interface LapRow {
+  driver_number: number;
+  lap_number: number;
+  lap_duration: number | null;
+  duration_sector_1: number | null;
+  duration_sector_2: number | null;
+  duration_sector_3: number | null;
+  segments_sector_1: number[] | null;
+  segments_sector_2: number[] | null;
+  segments_sector_3: number[] | null;
+  st_speed: number | null;
+  is_pit_out_lap: boolean;
 }
 
 /**
@@ -91,6 +113,30 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     // intervals exist only for races — quali/practice replays just skip gaps
   }
 
+  const lapRows = await openf1<LapRow[]>("laps", { session_key: sessionKey }).catch(() => [] as LapRow[]);
+  const laps: ReplayBlob["laps"] = {};
+  for (const l of lapRows) {
+    (laps[l.driver_number] ??= []).push({
+      lap: l.lap_number,
+      time: l.lap_duration,
+      sectors: [l.duration_sector_1, l.duration_sector_2, l.duration_sector_3],
+      segments: [l.segments_sector_1 ?? [], l.segments_sector_2 ?? [], l.segments_sector_3 ?? []],
+      trap: l.st_speed,
+      pitOut: l.is_pit_out_lap,
+    });
+  }
+
+  const stintRows = await openf1<StintRow[]>("stints", { session_key: sessionKey }).catch(() => [] as StintRow[]);
+  const stints: ReplayBlob["stints"] = {};
+  for (const s of stintRows) {
+    (stints[s.driver_number] ??= []).push({
+      compound: s.compound,
+      lapStart: s.lap_start,
+      lapEnd: s.lap_end,
+      tyreAge: s.tyre_age_at_start,
+    });
+  }
+
   return {
     sessionKey,
     sessionName: session.session_name,
@@ -103,6 +149,8 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     order,
     gapHz: GAP_HZ,
     gaps,
+    stints,
+    laps,
   };
 }
 
@@ -114,7 +162,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ sessionKey
   const file = path.join(BAKE_DIR, `${sessionKey}.json`);
   try {
     const cached = await readFile(file, "utf8");
-    return new NextResponse(cached, { headers: { "content-type": "application/json" } });
+    // blobs baked before the laps field existed get re-baked once
+    if (cached.includes('"laps"')) {
+      return new NextResponse(cached, { headers: { "content-type": "application/json" } });
+    }
   } catch {
     // not baked yet
   }

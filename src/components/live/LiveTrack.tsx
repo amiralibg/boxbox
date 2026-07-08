@@ -1,35 +1,26 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit } from "@/lib/track/geometry";
+import type { LivePlayback } from "@/lib/live/playback";
 import type { LiveMeta } from "@/lib/live/types";
 
-export interface CarTween {
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
-  /** wall-clock ms when the target frame arrived */
-  at: number;
-  /** ms to glide from -> to (≈ the poll interval) */
-  over: number;
-}
-
 /**
- * Live all-cars canvas. Frames arrive every few seconds; each car glides from
- * its previous position to the newest one over the poll interval, read from a
- * mutable tween map at 60fps — no React state on the hot path.
+ * Live all-cars canvas. The playback buffer replays polled frames on a
+ * smooth trailing clock; every rAF tick reads interpolated positions from
+ * it — no React state on the hot path.
  */
 export function LiveTrack({
   circuit,
   meta,
   colors,
-  tweens,
+  playback,
 }: {
   circuit: BakedCircuit;
   meta: LiveMeta;
   colors: Map<number, string>;
-  tweens: React.RefObject<Map<number, CarTween>>;
+  playback: React.RefObject<LivePlayback | null>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -57,6 +48,7 @@ export function LiveTrack({
       trackPath.closePath();
     };
 
+    const headings = new Map<number, number>();
     const draw = () => {
       raf = requestAnimationFrame(draw);
       if (!projector || !trackPath) return;
@@ -70,23 +62,23 @@ export function LiveTrack({
       ctx.lineWidth = 1.5;
       ctx.stroke(trackPath);
 
-      const now = performance.now();
+      const pb = playback.current;
+      if (!pb || !pb.hasData) return;
+      const t = pb.now();
       for (const d of meta.drivers) {
-        const tw = tweens.current?.get(d.num);
-        if (!tw) continue;
-        const u = Math.min(1, (now - tw.at) / tw.over);
-        const [px, py] = proj.project([tw.fromX + (tw.toX - tw.fromX) * u, tw.fromY + (tw.toY - tw.fromY) * u]);
+        const pos = pb.posAt(d.num, t);
+        if (!pos) continue;
+        const [px, py] = proj.project([pos.x, pos.y]);
         const color = colors.get(d.num) ?? "#7e7c92";
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(px, py, 5.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "#0b0b12";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        // heading from a short look-back along the buffered path
+        const prev = pb.posAt(d.num, t - 0.4) ?? pos;
+        const [qx, qy] = proj.project([prev.x, prev.y]);
+        const heading = headingBetween(qx, qy, px, py, headings.get(d.num) ?? 0);
+        headings.set(d.num, heading);
+        drawCar(ctx, px, py, heading, color, 0.85);
         ctx.font = "600 10px 'Space Grotesk', sans-serif";
         ctx.fillStyle = color;
-        ctx.fillText(d.acronym, px + 9, py - 7);
+        ctx.fillText(d.acronym, px + 12, py - 9);
       }
     };
 
@@ -98,7 +90,7 @@ export function LiveTrack({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [circuit, meta, colors, tweens]);
+  }, [circuit, meta, colors, playback]);
 
   return <canvas ref={canvasRef} className="h-full w-full" />;
 }

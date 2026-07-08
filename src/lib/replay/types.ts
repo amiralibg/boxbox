@@ -27,6 +27,22 @@ export interface ReplayBlob {
   /** per driver gap to leader (s) on gapGrid; null = no data / lapped */
   gapHz: number;
   gaps: Record<number, (number | null)[]>;
+  /** tyre stints per driver, chronological */
+  stints: Record<number, { compound: string | null; lapStart: number; lapEnd: number; tyreAge: number | null }[]>;
+  /** every lap per driver, chronological */
+  laps: Record<number, ReplayLap[]>;
+}
+
+export interface ReplayLap {
+  lap: number;
+  /** lap time seconds; null = in/out/aborted lap */
+  time: number | null;
+  sectors: [number | null, number | null, number | null];
+  /** raw minisector codes per sector (2048 yellow / 2049 green / 2051 purple / 2064 pit) */
+  segments: [number[], number[], number[]];
+  /** speed-trap km/h */
+  trap: number | null;
+  pitOut: boolean;
 }
 
 /** lerp a 2 Hz position channel at time t */

@@ -11,6 +11,21 @@ interface OpenF1Lap {
   lap_duration: number | null;
   date_start: string | null;
   is_pit_out_lap: boolean;
+  duration_sector_1: number | null;
+  duration_sector_2: number | null;
+  duration_sector_3: number | null;
+  st_speed: number | null;
+  segments_sector_1: number[] | null;
+  segments_sector_2: number[] | null;
+  segments_sector_3: number[] | null;
+}
+
+interface OpenF1Stint {
+  stint_number: number;
+  compound: string | null;
+  lap_start: number;
+  lap_end: number;
+  tyre_age_at_start: number | null;
 }
 
 interface LocationRow {
@@ -51,6 +66,11 @@ export async function GET(req: NextRequest) {
     const dur = best.lap_duration!;
     const windowStart = new Date(t0 - PAD_S * 1000).toISOString();
     const windowEnd = new Date(t0 + (dur + PAD_S) * 1000).toISOString();
+
+    const stints = await openf1<OpenF1Stint[]>("stints", { session_key: sessionKey, driver_number: driverNumber }).catch(
+      () => [] as OpenF1Stint[],
+    );
+    const stint = stints.find((s) => best.lap_number >= s.lap_start && best.lap_number <= s.lap_end);
 
     const [locations, carData] = [
       await openf1<LocationRow[]>("location", {
@@ -102,6 +122,11 @@ export async function GET(req: NextRequest) {
       brake: brake.map((v) => Math.round(v)),
       gear: gear.map((v) => Math.round(v)),
       drs: drsRaw.map((v) => v >= 10), // OpenF1 DRS codes: 10/12/14 = open
+      sectors: [best.duration_sector_1, best.duration_sector_2, best.duration_sector_3],
+      segments: [best.segments_sector_1 ?? [], best.segments_sector_2 ?? [], best.segments_sector_3 ?? []],
+      speedTrap: best.st_speed,
+      compound: stint?.compound ?? null,
+      tyreAge: stint ? (stint.tyre_age_at_start ?? 0) + (best.lap_number - stint.lap_start) : null,
     };
     return NextResponse.json(baked);
   } catch (e) {

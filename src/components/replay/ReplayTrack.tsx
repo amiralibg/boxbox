@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit } from "@/lib/track/geometry";
 import { sampleXY, type ReplayBlob } from "@/lib/replay/types";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
@@ -47,6 +48,7 @@ export function ReplayTrack({
       trackPath.closePath();
     };
 
+    const headings = new Map<number, number>();
     const draw = (t: number) => {
       if (!projector || !trackPath) return;
       const hl = highlight;
@@ -70,26 +72,20 @@ export function ReplayTrack({
         const focused = hl.has(d.num);
         const alpha = retired ? 0.15 : dimOthers && !focused ? 0.25 : 1;
 
-        ctx.globalAlpha = alpha;
-        if (focused) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = 12;
-        }
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(px, py, focused ? 7 : 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = "#0b0b12";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        const tAhead = Math.min(t + 0.4, ch.lastT);
+        const [ax, ay] = sampleXY(ch, blob.hz, tAhead);
+        const [qx, qy] = projector.project([ax, ay]);
+        const heading = headingBetween(px, py, qx, qy, headings.get(d.num) ?? 0);
+        headings.set(d.num, heading);
+        drawCar(ctx, px, py, heading, color, focused ? 1.0 : 0.8, { glow: focused, alpha });
 
         if ((focused || !dimOthers) && !retired) {
+          ctx.globalAlpha = alpha;
           ctx.font = "600 10px 'Space Grotesk', sans-serif";
           ctx.fillStyle = color;
-          ctx.fillText(d.acronym, px + 9, py - 7);
+          ctx.fillText(d.acronym, px + 12, py - 9);
+          ctx.globalAlpha = 1;
         }
-        ctx.globalAlpha = 1;
       }
     };
 

@@ -8,10 +8,19 @@
   src: url("/fonts/space-grotesk.woff2") format("woff2");
 }
 
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
+}
+
 @theme {
   /* charcoal scale, cool-tinted */
   --color-ink-950: #08080d;
   --color-ink-900: #0b0b12;
+  --color-ink-850: #0e0e16;
   --color-ink-800: #12121c;
   --color-ink-700: #1a1a26;
   --color-ink-600: #23232f;
@@ -27,8 +36,18 @@
   --color-neon-amber: #ffb02e;
   --color-neon-green: #3ff5a0;
 
+  /* timing-screen conventions */
+  --color-sector-best: #b26cff; /* overall best — F1 "purple" */
+  --color-sector-pb: #3ff5a0; /* personal best — green */
+  --color-sector-set: #ffd60a; /* completed, no improvement — yellow */
+  --color-tyre-soft: #ff4d4d;
+  --color-tyre-medium: #ffd60a;
+  --color-tyre-hard: #e8e8f0;
+  --color-tyre-inter: #43d15f;
+  --color-tyre-wet: #3f9bff;
+
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 html {
@@ -44,6 +63,125 @@ body {
 ::selection {
   background: var(--color-neon-cyan);
   color: var(--color-ink-950);
+}
+
+/* kerb stripe — the BoxBox brand motif (apron kerbs, tilted 45°) */
+.kerb {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--kerb-color, var(--color-neon-cyan)) 0 5px,
+    transparent 5px 10px
+  );
+}
+
+/* chamfered corner for primary actions — one cut, bottom-right */
+.chamfer {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
+}
+
+/* custom range slider — hairline track, square neon thumb */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--color-ink-600);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  height: 14px;
+  width: 14px;
+  background: var(--color-neon-cyan);
+  border: none;
+  transition: transform 0.12s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"]::-moz-range-track {
+  height: 2px;
+  background: var(--color-ink-600);
+}
+input[type="range"]::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border: none;
+  border-radius: 0;
+  background: var(--color-neon-cyan);
+}
+
+/* custom checkbox — square, neon tick */
+input[type="checkbox"].box {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border: 1px solid var(--color-ink-600);
+  background: var(--color-ink-800);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: border-color 0.15s ease;
+}
+input[type="checkbox"].box:hover {
+  border-color: var(--color-fog-500);
+}
+input[type="checkbox"].box::before {
+  content: "";
+  height: 8px;
+  width: 8px;
+  background: var(--color-neon-cyan);
+  transform: scale(0);
+  transition: transform 0.12s ease;
+}
+input[type="checkbox"].box:checked::before {
+  transform: scale(1);
+}
+
+/* loading shimmer */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-ink-800);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(236, 234, 246, 0.045) 50%, transparent 70%);
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* thin dark scrollbars for panels */
+.panel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+.panel-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.panel-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-ink-600);
+  border-radius: 3px;
 }
 
 /* recap preview: title-arc draw-in (page-only; exports stay static) */

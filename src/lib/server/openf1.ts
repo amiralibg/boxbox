@@ -6,7 +6,7 @@
  * zero API calls after the first request.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "openf1");
@@ -15,7 +15,11 @@ const PAUSE_MS = 400;
 let queue: Promise<unknown> = Promise.resolve();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function openf1<T>(endpoint: string, params: Record<string, string | number>): Promise<T> {
+export async function openf1<T>(
+  endpoint: string,
+  params: Record<string, string | number>,
+  opts: { maxAgeMs?: number } = {},
+): Promise<T> {
   const qs = Object.entries(params)
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
     .join("&");
@@ -24,9 +28,13 @@ export async function openf1<T>(endpoint: string, params: Record<string, string 
   const key = createHash("sha1").update(url).digest("hex").slice(0, 24);
   const file = path.join(CACHE_DIR, `${endpoint}-${key}.json`);
   try {
+    if (opts.maxAgeMs != null) {
+      const { mtimeMs } = await stat(file);
+      if (Date.now() - mtimeMs > opts.maxAgeMs) throw new Error("stale");
+    }
     return JSON.parse(await readFile(file, "utf8"));
   } catch {
-    // cache miss
+    // cache miss or stale
   }
 
   // serialize network calls so parallel route handlers can't burst the API

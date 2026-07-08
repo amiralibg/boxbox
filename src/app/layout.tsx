@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import type { Metadata, Viewport } from "next";
+import { SiteNav } from "@/components/ui/SiteNav";
 import "uplot/dist/uPlot.min.css";
 import "./globals.css";
 
@@ -8,39 +8,26 @@ export const metadata: Metadata = {
   description: "Telemetry replays, ghost laps, circuit posters and championship analysis.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="min-h-screen bg-ink-950 text-fog-100">
-        <header className="border-b border-ink-600/60">
-          <div className="mx-auto flex h-14 max-w-7xl items-center gap-8 px-6">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="block h-2.5 w-2.5 bg-neon-cyan" />
-              <span className="text-sm font-bold tracking-[0.25em]">BOXBOX</span>
-            </Link>
-            <nav className="flex items-center gap-6 text-[13px] tracking-wide text-fog-300">
-              <Link href="/poster" className="transition-colors hover:text-fog-100">
-                Posters
-              </Link>
-              <Link href="/ghost" className="transition-colors hover:text-fog-100">
-                Ghost lab
-              </Link>
-              <Link href="/replay" className="transition-colors hover:text-fog-100">
-                Replay
-              </Link>
-              <Link href="/numbers" className="transition-colors hover:text-fog-100">
-                The Numbers
-              </Link>
-              <Link href="/recap" className="transition-colors hover:text-fog-100">
-                Recap
-              </Link>
-              <Link href="/live" className="transition-colors hover:text-fog-100">
-                Live
-              </Link>
-            </nav>
-          </div>
-        </header>
+        <SiteNav />
         {children}
+        <footer className="mt-16 border-t border-ink-700/70">
+          <div className="mx-auto max-w-7xl px-5 md:px-6">
+            <div className="kerb h-[5px] w-24 opacity-60" />
+            <div className="flex items-center justify-between py-6">
+              <span className="font-mono text-[10px] tracking-[0.25em] text-fog-500">BOXBOX</span>
+              <span className="font-mono text-[10px] tracking-wide text-fog-500">DATA · OPENF1 + F1DB + MULTIVIEWER</span>
+            </div>
+          </div>
+        </footer>
       </body>
     </html>
   );
