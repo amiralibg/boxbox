@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/brand/boxbox-logo.svg" width="360" alt="BoxBox — Formula One Data System">
+  <img src="public/brand/boxbox-mark.svg" width="360" alt="BoxBox — Formula One Data System">
 </p>
 
 <p align="center"><strong>Formula One data system</strong> — telemetry replay, lap comparison, technical analysis and configurable exports.</p>
