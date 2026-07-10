@@ -72,6 +72,12 @@ export function LiveTrack({
         if (!pos) continue;
         const [px, py] = proj.project([pos.x, pos.y]);
         const color = colors.get(d.num) ?? pal.axis;
+        if (pos.stale) {
+          // signal hole (garage / dropped fixes): hold faded, keep the last
+          // heading so the marker doesn't spin, drop the label
+          drawCar(ctx, px, py, headings.get(d.num) ?? 0, color, 0.85, { alpha: 0.3 });
+          continue;
+        }
         // heading from a short look-back along the buffered path
         const prev = pb.posAt(d.num, t - 0.4) ?? pos;
         const [qx, qy] = proj.project([prev.x, prev.y]);

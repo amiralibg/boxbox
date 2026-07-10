@@ -11,6 +11,8 @@ export interface ReplayDriver {
 }
 
 export interface ReplayBlob {
+  /** bake format version — bump BAKE_VERSION in the route to force re-bakes */
+  version: number;
   sessionKey: number;
   sessionName: string;
   circuitKey: number;
@@ -31,10 +33,44 @@ export interface ReplayBlob {
   stints: Record<number, { compound: string | null; lapStart: number; lapEnd: number; tyreAge: number | null }[]>;
   /** every lap per driver, chronological */
   laps: Record<number, ReplayLap[]>;
+  /** race-control messages (flags, SC/VSC, investigations), ascending t */
+  raceControl: RaceControlEvent[];
+  /** pit-lane visits per driver: lap, entry time, pit-lane duration */
+  pits: Record<number, { lap: number; t: number; durationS: number | null }[]>;
+  /** weather samples (~1/min), ascending t */
+  weather: WeatherSample[];
+  /** team-radio clips per driver (URLs only; playback UI comes later) */
+  radio: Record<number, { t: number; url: string }[]>;
+}
+
+export interface RaceControlEvent {
+  t: number;
+  /** Flag | SafetyCar | Drs | CarEvent | Other */
+  category: string;
+  /** GREEN | YELLOW | DOUBLE YELLOW | RED | CHEQUERED | CLEAR | BLUE | BLACK AND WHITE … */
+  flag: string | null;
+  /** Track | Sector | Driver */
+  scope: string | null;
+  sector: number | null;
+  msg: string;
+  driver: number | null;
+  lap: number | null;
+}
+
+export interface WeatherSample {
+  t: number;
+  airTemp: number;
+  trackTemp: number;
+  humidity: number;
+  windSpeed: number;
+  windDir: number;
+  rainfall: number;
 }
 
 export interface ReplayLap {
   lap: number;
+  /** session-seconds at lap start; null when OpenF1 has no date_start */
+  tStart: number | null;
   /** lap time seconds; null = in/out/aborted lap */
   time: number | null;
   sectors: [number | null, number | null, number | null];

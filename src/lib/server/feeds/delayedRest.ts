@@ -2,11 +2,27 @@ import type { DriverInfo, SessionInfo } from "@/lib/telemetry/types";
 import type { LiveFeed, LiveFrame, LiveMeta } from "@/lib/live/types";
 
 const POLL_MS = 4000;
-/** how far the real-time window trails the wall clock — the free API publishes
- * data a few seconds late, so chasing "now" only produces permanent gaps */
-const DELAY_S = 5;
+/** starting real-time delay behind the wall clock — the free API publishes
+ * data late and unevenly; chasing "now" starves the buffer and freezes the
+ * field. The delay adapts per poll from the measured publication lag. */
+const INITIAL_DELAY_S = 45;
+const MIN_DELAY_S = 15;
+const MAX_DELAY_S = 90;
+/** margin added over the measured lag so ordinary jitter never drains us */
+const DELAY_MARGIN_S = 8;
 /** location samples are bucketed to this grid only to merge simultaneous rows */
 const BUCKET_S = 0.01;
+
+/**
+ * Next real-time delay from the newest measured publication lag (how far the
+ * newest returned sample trails the wall clock). EMA so one outlier poll
+ * doesn't yank the clock around; clamped to a sane window. Pure — unit
+ *-testable outside a race weekend.
+ */
+export function computeDelay(prevDelayS: number, observedLagS: number): number {
+  const target = Math.min(MAX_DELAY_S, Math.max(MIN_DELAY_S, observedLagS + DELAY_MARGIN_S));
+  return prevDelayS * 0.8 + target * 0.2;
+}
 
 interface LocationRow {
   date: string;
@@ -52,6 +68,9 @@ export class DelayedRestFeed implements LiveFeed {
   private startedAt = 0;
   private polling = false;
   private seeded = false;
+  private delayS = INITIAL_DELAY_S;
+  private failures = 0;
+  private skipPolls = 0;
 
   constructor(
     private sessionKey: number,
@@ -92,7 +111,7 @@ export class DelayedRestFeed implements LiveFeed {
   /** session-relative seconds of "now" (remapped when simulating) */
   private virtualNow(): number {
     if (this.simulate) return ((Date.now() - this.startedAt) / 1000) * this.speed;
-    return (Date.now() - this.t0) / 1000 - DELAY_S;
+    return (Date.now() - this.t0) / 1000 - this.delayS;
   }
 
   private iso(t: number): string {
@@ -101,6 +120,10 @@ export class DelayedRestFeed implements LiveFeed {
 
   private async poll() {
     if (this.polling) return; // never overlap slow polls
+    if (this.skipPolls > 0) {
+      this.skipPolls--;
+      return;
+    }
     this.polling = true;
     try {
       const now = Math.min(this.virtualNow(), this.tEnd);
@@ -150,15 +173,27 @@ export class DelayedRestFeed implements LiveFeed {
       // overlapping window; the client applies them idempotently.)
       this.lastT = Number.isFinite(newest) ? Math.max(from, newest) : Math.max(from, now - 10);
 
+      // adapt the real-time delay to how late the API actually publishes:
+      // newest sample trailing the wall clock by 20s means a 5s delay would
+      // return nothing poll after poll and the field would freeze
+      if (!this.simulate && Number.isFinite(newest)) {
+        const observedLag = (Date.now() - this.t0) / 1000 - newest;
+        this.delayS = computeDelay(this.delayS, observedLag);
+      }
+
       const frames = [...byBucket.values()].sort((a, b) => a.t - b.t);
       for (const frame of frames) for (const cb of this.subs) cb(frame);
+      this.failures = 0;
 
       if (now >= this.tEnd) {
         for (const cb of this.endSubs) cb();
         this.stop();
       }
-    } catch {
-      // transient API failure — skip this cycle, next poll retries
+    } catch (e) {
+      // transient API failure — back off exponentially instead of hammering
+      this.failures++;
+      this.skipPolls = Math.min(2 ** this.failures, 8) - 1;
+      console.warn(`DelayedRestFeed poll failed (×${this.failures}, backing off ${this.skipPolls} cycles):`, e);
     } finally {
       this.polling = false;
     }

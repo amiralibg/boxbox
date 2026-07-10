@@ -14,6 +14,44 @@ never relitigate them.
 - **Phase 5 (recap generator): DONE.** `/recap` route.
 - **Phase 6 (live mode): DONE.** `/live` route. ALL SPEC PHASES COMPLETE.
 
+## Technical pass (2026-07): dark default + full race viewer
+
+- **Dark ("night") is the default theme.** Toggle labels are DARK / LIGHT
+  (`Theme` type values stay `"paper" | "dark"` — label-only rename, stored
+  prefs unaffected). Shadows use the per-theme `--shadow-color` var — never
+  hardcode ink-rgba shadows; accent swatch buttons always carry
+  `border-ink/25` so the Ink swatch reads on dark.
+- **Copy voice is terse technical** (what it does, what data, what cadence).
+  No `Nº` folios, no "Baking…", no magazine standfirsts. The visual system
+  (Fraunces, red full stop, double rules) stays.
+- **Replay bake v2**: version lives in the FILENAME (`{key}.v{N}.json`) —
+  bump `BAKE_VERSION` in the route to force re-bakes, never sniff the JSON.
+  v2 adds `raceControl` (race_control), `pits` (pit), `weather`, `radio`
+  (team_radio; URLs baked now, playback UI deferred) and `ReplayLap.tStart`
+  (nullable — guard it), which maps lap ↔ session time for all charts.
+- **Derivations are client-side** (`src/lib/replay/derive.ts`): track-status
+  spans (SC/VSC/yellow/red folding), overtakes (order-event swaps; t<120s
+  skipped, ±30s of a pit entry tagged `pitCycle` and labelled POS not PASS),
+  fastest-lap progression, lap↔time maps. Deliberately not baked so heuristic
+  tweaks never invalidate cached blobs.
+- Replay UI: RaceControlTicker (click row = seek), ScrubBar (status bands +
+  FL ticks + pit ticks for highlighted drivers), track tint + badge under
+  SC/VSC/red, WeatherStrip, pit-stop table, LapChart (position vs lap,
+  stepped), StintPaceChart (lap time per stint, compound-colored, in/out +
+  non-green laps nulled). Charts clone the GapChart uPlot architecture.
+  GOTCHA: `compoundStyle()` returns `var(--…)` strings — resolve against
+  computed style before handing to canvas/uPlot.
+- **Live smoothness fix**: the old fixed `DELAY_S = 5` starved the buffer
+  (OpenF1 publishes later than 5s) → field froze then jumped. Now
+  `computeDelay()` (exported, pure) adapts the delay per poll from measured
+  publication lag: EMA toward lag+8s, clamped 15–90s, initial 45s. Poll
+  failures back off exponentially (skip `min(2^n, 8)` cycles) instead of
+  silently dropping. Client `posAt()` is Catmull-Rom (not lerp — 3.7 Hz
+  chords cut corners) and returns `stale: true` when the bracket spans >6
+  session-s (signal hole): LiveTrack holds the car faded with frozen heading
+  rather than sliding it across the infield. Leaderboard gaps interpolate
+  via `LivePlayback.gapAt()` every 300ms tick — order stays event-based.
+
 ## Redesign (2026-07): print editorial
 
 - Replaced the dark ink/neon theme with a print-editorial system: warm paper

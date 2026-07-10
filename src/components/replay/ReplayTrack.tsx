@@ -3,13 +3,30 @@
 import { useEffect, useRef } from "react";
 import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit } from "@/lib/track/geometry";
+import { statusAt, type StatusSpan, type TrackStatus } from "@/lib/replay/derive";
 import { sampleXY, type ReplayBlob } from "@/lib/replay/types";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
 import { chartPalette } from "@/lib/theme";
 
+/** track-status → tint CSS var; green/chequered draw the plain bed */
+const STATUS_VAR: Partial<Record<TrackStatus, string>> = {
+  yellow: "--color-ochre",
+  sc: "--color-ochre",
+  vsc: "--color-ochre",
+  red: "--color-red",
+};
+
+const STATUS_BADGE: Partial<Record<TrackStatus, string>> = {
+  yellow: "YELLOW",
+  sc: "SAFETY CAR",
+  vsc: "VSC",
+  red: "RED FLAG",
+};
+
 /**
  * All-cars track canvas. Same pattern as the ghost TrackView: static track
- * bed + imperative 60fps dots driven by the player clock.
+ * bed + imperative 60fps dots driven by the player clock. When race control
+ * has the track under yellow/SC/VSC/red, the bed tints and a badge names it.
  */
 export function ReplayTrack({
   circuit,
@@ -17,12 +34,14 @@ export function ReplayTrack({
   colors,
   player,
   highlight,
+  status = [],
 }: {
   circuit: BakedCircuit;
   blob: ReplayBlob;
   colors: Map<number, string>;
   player: TelemetryPlayer;
   highlight: Set<number>;
+  status?: StatusSpan[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -50,18 +69,37 @@ export function ReplayTrack({
     };
 
     const headings = new Map<number, number>();
+    const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const draw = (t: number) => {
       if (!projector || !trackPath) return;
       const hl = highlight;
       const pal = chartPalette();
+      const st = statusAt(status, t);
+      const tintVar = STATUS_VAR[st];
+      const tint = tintVar ? cssVar(tintVar) : null;
       ctx.clearRect(0, 0, w, h);
       ctx.lineJoin = "round";
       ctx.strokeStyle = pal.trackBed;
       ctx.lineWidth = 10;
       ctx.stroke(trackPath);
-      ctx.strokeStyle = pal.inkFaint;
+      if (tint) {
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.strokeStyle = tint;
+        ctx.lineWidth = 10;
+        ctx.stroke(trackPath);
+        ctx.restore();
+      }
+      ctx.strokeStyle = tint ?? pal.inkFaint;
       ctx.lineWidth = 1.25;
       ctx.stroke(trackPath);
+      if (tint) {
+        ctx.font = "700 11px 'JetBrains Mono', monospace";
+        ctx.fillStyle = tint;
+        ctx.textAlign = "right";
+        ctx.fillText(STATUS_BADGE[st] ?? "", w - 10, 18);
+        ctx.textAlign = "left";
+      }
 
       const dimOthers = hl.size > 0;
       for (const d of blob.drivers) {
@@ -103,7 +141,7 @@ export function ReplayTrack({
       unsub();
       ro.disconnect();
     };
-  }, [circuit, blob, colors, player, highlight]);
+  }, [circuit, blob, colors, player, highlight, status]);
 
   return <canvas ref={canvasRef} className="h-full w-full" />;
 }

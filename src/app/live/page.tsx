@@ -114,11 +114,12 @@ export default function LivePage() {
 
   useEffect(() => () => esRef.current?.close(), []);
 
-  // leaderboard + clock tick: apply timed order/gap events as playback reaches them
+  // leaderboard + clock tick: order comes from timed events as playback
+  // reaches them; gaps interpolate continuously so they glide instead of
+  // stepping once per poll
   useEffect(() => {
     if (status !== "live") return;
     const posMap = new Map<number, number>();
-    const gapMap = new Map<number, number | null>();
     const tick = () => {
       const pb = playback.current;
       if (!pb || !pb.hasData) return;
@@ -129,15 +130,13 @@ export default function LivePage() {
         bufRef.current.textContent = `BUF ${buf.toFixed(1)}S`;
         bufRef.current.style.color = buf < pollSRef.current ? "var(--color-red)" : "";
       }
-      const events = pb.drainEvents(t);
-      if (events.length === 0) return;
-      for (const e of events) {
+      for (const e of pb.drainEvents(t)) {
         if (e.order) for (const o of e.order) posMap.set(o.num, o.pos);
-        if (e.gaps) for (const [num, gap] of Object.entries(e.gaps)) gapMap.set(Number(num), gap);
       }
+      if (posMap.size === 0) return;
       setOrder(
         [...posMap]
-          .map(([num, pos]) => ({ num, pos, gap: gapMap.get(num) ?? null }))
+          .map(([num, pos]) => ({ num, pos, gap: pb.gapAt(num, t) }))
           .sort((a, b) => a.pos - b.pos),
       );
     };

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { openf1 } from "@/lib/server/openf1";
@@ -8,6 +8,8 @@ import type { DriverInfo, SessionInfo } from "@/lib/telemetry/types";
 
 const POS_HZ = 2;
 const GAP_HZ = 0.25;
+/** bump to invalidate every cached blob — the version is part of the filename */
+const BAKE_VERSION = 2;
 const BAKE_DIR = path.join(process.cwd(), ".cache", "replay");
 
 interface LocationRow {
@@ -39,6 +41,7 @@ interface IntervalRow {
 interface LapRow {
   driver_number: number;
   lap_number: number;
+  date_start: string | null;
   lap_duration: number | null;
   duration_sector_1: number | null;
   duration_sector_2: number | null;
@@ -48,6 +51,40 @@ interface LapRow {
   segments_sector_3: number[] | null;
   st_speed: number | null;
   is_pit_out_lap: boolean;
+}
+
+interface RaceControlRow {
+  date: string;
+  category: string;
+  flag: string | null;
+  scope: string | null;
+  sector: number | null;
+  message: string;
+  driver_number: number | null;
+  lap_number: number | null;
+}
+
+interface PitRow {
+  date: string;
+  driver_number: number;
+  lap_number: number;
+  pit_duration: number | null;
+}
+
+interface WeatherRow {
+  date: string;
+  air_temperature: number;
+  track_temperature: number;
+  humidity: number;
+  wind_speed: number;
+  wind_direction: number;
+  rainfall: number;
+}
+
+interface RadioRow {
+  date: string;
+  driver_number: number;
+  recording_url: string;
 }
 
 /**
@@ -118,6 +155,7 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
   for (const l of lapRows) {
     (laps[l.driver_number] ??= []).push({
       lap: l.lap_number,
+      tStart: l.date_start ? Math.round(((Date.parse(l.date_start) - t0) / 1000) * 10) / 10 : null,
       time: l.lap_duration,
       sectors: [l.duration_sector_1, l.duration_sector_2, l.duration_sector_3],
       segments: [l.segments_sector_1 ?? [], l.segments_sector_2 ?? [], l.segments_sector_3 ?? []],
@@ -137,7 +175,61 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     });
   }
 
+  const rcRows = await openf1<RaceControlRow[]>("race_control", { session_key: sessionKey }).catch(
+    () => [] as RaceControlRow[],
+  );
+  const raceControl: ReplayBlob["raceControl"] = rcRows
+    .map((r) => ({
+      t: Math.round(((Date.parse(r.date) - t0) / 1000) * 10) / 10,
+      category: r.category,
+      flag: r.flag,
+      scope: r.scope,
+      sector: r.sector,
+      msg: r.message,
+      driver: r.driver_number,
+      lap: r.lap_number,
+    }))
+    .filter((e) => e.t >= 0 && e.t <= duration)
+    .sort((a, b) => a.t - b.t);
+
+  const pitRows = await openf1<PitRow[]>("pit", { session_key: sessionKey }).catch(() => [] as PitRow[]);
+  const pits: ReplayBlob["pits"] = {};
+  for (const p of [...pitRows].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))) {
+    (pits[p.driver_number] ??= []).push({
+      lap: p.lap_number,
+      t: Math.round(((Date.parse(p.date) - t0) / 1000) * 10) / 10,
+      durationS: p.pit_duration,
+    });
+  }
+
+  const weatherRows = await openf1<WeatherRow[]>("weather", { session_key: sessionKey }).catch(
+    () => [] as WeatherRow[],
+  );
+  const weather: ReplayBlob["weather"] = weatherRows
+    .map((w) => ({
+      t: Math.round((Date.parse(w.date) - t0) / 1000),
+      airTemp: w.air_temperature,
+      trackTemp: w.track_temperature,
+      humidity: w.humidity,
+      windSpeed: w.wind_speed,
+      windDir: w.wind_direction,
+      rainfall: w.rainfall,
+    }))
+    .filter((w) => w.t >= 0 && w.t <= duration)
+    .sort((a, b) => a.t - b.t);
+
+  const radioRows = await openf1<RadioRow[]>("team_radio", { session_key: sessionKey }).catch(
+    () => [] as RadioRow[],
+  );
+  const radio: ReplayBlob["radio"] = {};
+  for (const r of [...radioRows].sort((a, b) => Date.parse(a.date) - Date.parse(b.date))) {
+    const t = Math.round(((Date.parse(r.date) - t0) / 1000) * 10) / 10;
+    if (t < 0 || t > duration) continue;
+    (radio[r.driver_number] ??= []).push({ t, url: r.recording_url });
+  }
+
   return {
+    version: BAKE_VERSION,
     sessionKey,
     sessionName: session.session_name,
     circuitKey: session.circuit_key,
@@ -151,6 +243,10 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     gaps,
     stints,
     laps,
+    raceControl,
+    pits,
+    weather,
+    radio,
   };
 }
 
@@ -159,20 +255,20 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ sessionKey
   if (!/^\d+$/.test(sessionKey)) {
     return NextResponse.json({ error: "bad session key" }, { status: 400 });
   }
-  const file = path.join(BAKE_DIR, `${sessionKey}.json`);
+  // version in the filename: bumping BAKE_VERSION simply stops matching old
+  // blobs — no JSON sniffing, stale versions are ignored on disk
+  const file = path.join(BAKE_DIR, `${sessionKey}.v${BAKE_VERSION}.json`);
   try {
     const cached = await readFile(file, "utf8");
-    // blobs baked before the laps field existed get re-baked once
-    if (cached.includes('"laps"')) {
-      return new NextResponse(cached, { headers: { "content-type": "application/json" } });
-    }
+    return new NextResponse(cached, { headers: { "content-type": "application/json" } });
   } catch {
-    // not baked yet
+    // not baked yet at this version
   }
   try {
     const blob = await bake(Number(sessionKey));
     await mkdir(BAKE_DIR, { recursive: true });
     await writeFile(file, JSON.stringify(blob));
+    await rm(path.join(BAKE_DIR, `${sessionKey}.json`), { force: true }); // pre-versioning leftover
     return NextResponse.json(blob);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 502 });

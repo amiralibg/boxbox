@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GapChart } from "@/components/replay/GapChart";
+import { LapChart } from "@/components/replay/LapChart";
+import { RaceControlTicker } from "@/components/replay/RaceControlTicker";
 import { ReplayTrack } from "@/components/replay/ReplayTrack";
+import { ScrubBar } from "@/components/replay/ScrubBar";
+import { StintPaceChart } from "@/components/replay/StintPaceChart";
+import { WeatherStrip } from "@/components/replay/WeatherStrip";
 import { LoadingLine, StageSkeleton } from "@/components/ui/Loading";
 import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
 import { Select } from "@/components/ui/Select";
@@ -10,6 +15,7 @@ import { compoundStyle, SegmentStrip, TimingTable, TyreChip, type TimingRow } fr
 import { teamColor } from "@/lib/color";
 import { useTheme } from "@/lib/theme";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
+import { deriveFastestLaps, deriveOvertakes, deriveTrackStatus } from "@/lib/replay/derive";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
 import { gapAt, orderAt, type ReplayBlob, type ReplayLap } from "@/lib/replay/types";
 import type { BakedCircuit } from "@/lib/track/geometry";
@@ -202,6 +208,26 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
 
   const byNum = useMemo(() => new Map(blob.drivers.map((d) => [d.num, d])), [blob]);
   const hasStints = Object.keys(blob.stints ?? {}).length > 0;
+
+  // derived race events — client-side so heuristics can change without re-bakes
+  const status = useMemo(() => deriveTrackStatus(blob.raceControl ?? []), [blob]);
+  const overtakes = useMemo(() => deriveOvertakes(blob.order, blob.pits ?? {}), [blob]);
+  const fastestLaps = useMemo(() => deriveFastestLaps(blob.laps ?? {}), [blob]);
+  const pitRows: TimingRow[] = useMemo(() => {
+    const all = Object.entries(blob.pits ?? {}).flatMap(([num, stops]) =>
+      stops.map((p) => ({ num: Number(num), ...p })),
+    );
+    all.sort((a, b) => (a.durationS ?? Infinity) - (b.durationS ?? Infinity));
+    return all.map((p, i) => ({
+      key: `${p.num}-${p.lap}`,
+      cells: {
+        rank: { text: String(i + 1), tone: "muted" as const },
+        driver: { text: byNum.get(p.num)?.acronym ?? `#${p.num}`, color: colors.get(p.num) },
+        lap: { text: `L${p.lap}`, tone: "muted" as const },
+        dur: p.durationS == null ? { text: "—", tone: "muted" as const } : { text: p.durationS.toFixed(1), tone: i === 0 ? ("best" as const) : ("default" as const) },
+      },
+    }));
+  }, [blob, byNum, colors]);
   const totalLaps = useMemo(
     () => Math.max(1, ...Object.values(blob.stints ?? {}).flat().map((s) => s.lapEnd)),
     [blob],
@@ -222,7 +248,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               <span className="font-mono text-[11px] text-ink-3">{blob.drivers.length} CARS</span>
             </div>
             <div className="aspect-[4/3]">
-              <ReplayTrack circuit={circuit} blob={blob} colors={colors} player={player} highlight={highlight} />
+              <ReplayTrack circuit={circuit} blob={blob} colors={colors} player={player} highlight={highlight} status={status} />
             </div>
           </Panel>
 
@@ -251,16 +277,22 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               <span className="ml-auto hidden text-[10px] tracking-[0.2em] text-ink-3 sm:block">SESSION CLOCK</span>
               <span ref={clockRef} className="font-mono text-[13px] tabular-nums text-ink">0:00:00</span>
             </div>
-            <input
-              ref={scrubRef}
-              type="range"
-              min={0}
-              max={blob.duration}
-              step={1}
-              defaultValue={0}
-              onInput={(e) => player.seek(Number(e.currentTarget.value))}
-              className="mt-3.5 w-full"
-            />
+            <div className="mt-3.5">
+              <ScrubBar
+                ref={scrubRef}
+                blob={blob}
+                player={player}
+                status={status}
+                fastestLaps={fastestLaps}
+                highlight={highlight}
+                colors={colors}
+              />
+            </div>
+            {(blob.weather ?? []).length > 0 && (
+              <div className="mt-2 text-right">
+                <WeatherStrip weather={blob.weather} player={player} />
+              </div>
+            )}
           </Panel>
         </div>
 
@@ -293,11 +325,72 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
         </Panel>
       </div>
 
+      {((blob.raceControl ?? []).length > 0 || pitRows.length > 0) && (
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Panel className="max-h-[360px] min-w-0 overflow-hidden">
+            <RaceControlTicker
+              raceControl={blob.raceControl ?? []}
+              overtakes={overtakes}
+              fastestLaps={fastestLaps}
+              byNum={byNum}
+              colors={colors}
+              player={player}
+            />
+          </Panel>
+          {pitRows.length > 0 && (
+            <Panel className="max-h-[360px] overflow-hidden pb-1 pt-4">
+              <SectionLabel className="px-4">PIT STOPS — PIT-LANE TIME</SectionLabel>
+              <div className="panel-scroll mt-2 max-h-[300px] overflow-y-auto">
+                <TimingTable
+                  dense
+                  columns={[
+                    { key: "rank", header: "", align: "right" },
+                    { key: "driver", header: "DRV" },
+                    { key: "lap", header: "LAP", align: "right" },
+                    { key: "dur", header: "SECONDS", align: "right" },
+                  ]}
+                  rows={pitRows}
+                />
+              </div>
+            </Panel>
+          )}
+        </div>
+      )}
+
       {Object.keys(blob.gaps).length > 0 && (
         <Panel className="mt-5 px-3 pb-3 pt-4 md:px-4">
           <SectionLabel className="px-1">GAP TO LEADER</SectionLabel>
           <div className="mt-2">
             <GapChart blob={blob} colors={colors} dashed={dashed} player={player} highlight={highlight} />
+          </div>
+        </Panel>
+      )}
+
+      {blob.order.length > 0 && Object.keys(blob.laps ?? {}).length > 0 && (
+        <Panel className="mt-5 px-3 pb-3 pt-4 md:px-4">
+          <SectionLabel className="px-1">LAP CHART — POSITION BY LAP</SectionLabel>
+          <div className="mt-2">
+            <LapChart blob={blob} colors={colors} dashed={dashed} player={player} highlight={highlight} />
+          </div>
+        </Panel>
+      )}
+
+      {Object.keys(blob.laps ?? {}).length > 0 && (
+        <Panel className="mt-5 px-3 pb-3 pt-4 md:px-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 px-1">
+            <SectionLabel>STINT PACE — LAP TIME BY COMPOUND</SectionLabel>
+            <span className="font-mono text-[10px] text-ink-3">
+              {highlight.size > 0 ? "HIGHLIGHTED DRIVERS" : "WINNER — CLICK THE ORDER TO ADD DRIVERS"} · IN/OUT + SC LAPS EXCLUDED
+            </span>
+          </div>
+          <div className="mt-2">
+            <StintPaceChart
+              blob={blob}
+              nums={highlight.size > 0 ? [...highlight] : stintOrder[0] ? [stintOrder[0].num] : []}
+              colors={colors}
+              status={status}
+              player={player}
+            />
           </div>
         </Panel>
       )}
