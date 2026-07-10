@@ -8,6 +8,7 @@ import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Sect
 import { Select } from "@/components/ui/Select";
 import { SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { distinctPair, teamColor } from "@/lib/color";
+import { useTheme } from "@/lib/theme";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import { buildDeltaProfile, deltaAt } from "@/lib/telemetry/delta";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
@@ -30,6 +31,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function GhostPage() {
+  const theme = useTheme();
   const [year, setYear] = useState(2026);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetingKey, setMeetingKey] = useState<number | null>(null);
@@ -99,7 +101,10 @@ export default function GhostPage() {
 
   const driverA = drivers.find((d) => d.driver_number === numA);
   const driverB = drivers.find((d) => d.driver_number === numB);
-  const [colorA, colorB] = distinctPair(teamColor(driverA?.team_colour ?? null), teamColor(driverB?.team_colour ?? null, "#ff2d78"));
+  const [colorA, colorB] = distinctPair(
+    teamColor(driverA?.team_colour ?? null, theme),
+    teamColor(driverB?.team_colour ?? null, theme, theme === "dark" ? "#e63b52" : "#c8102e"),
+  );
 
   const driverOptions = (exclude: number | null) =>
     drivers.map((d) => ({
@@ -169,7 +174,7 @@ export default function GhostPage() {
       </Panel>
 
       {error && (
-        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
 
       {loading && !laps && <StageSkeleton label="FASTEST LAPS" note="RESAMPLING TELEMETRY" sidebarRows={6} />}
@@ -220,7 +225,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
       const gap = deltaAt(profile, d);
       if (gapRef.current) {
         gapRef.current.textContent = `${gap >= 0 ? "+" : "−"}${Math.abs(gap).toFixed(3)}`;
-        gapRef.current.style.color = gap > 0.005 ? colorB : gap < -0.005 ? colorA : "#eceaf6";
+        gapRef.current.style.color = gap > 0.005 ? colorB : gap < -0.005 ? colorA : "var(--color-ink)";
       }
       if (clockRef.current) clockRef.current.textContent = fmtLap(t);
       if (scrubRef.current) scrubRef.current.value = String(t);
@@ -250,7 +255,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
           text: (
             <span className="flex items-center gap-1.5">
               <TyreChip compound={lap.compound} />
-              {lap.tyreAge != null && <span className="text-fog-500">{lap.tyreAge}L</span>}
+              {lap.tyreAge != null && <span className="text-ink-3">{lap.tyreAge}L</span>}
             </span>
           ),
         },
@@ -277,7 +282,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
         <Panel className="min-w-0 overflow-hidden">
           <div className="flex items-baseline justify-between px-4 pt-4">
             <SectionLabel>{circuit.name.toUpperCase()} — FASTEST LAPS</SectionLabel>
-            <span className="font-mono text-[11px] text-fog-500">LAP {lapA.lapNumber} / {lapB.lapNumber}</span>
+            <span className="font-mono text-[11px] text-ink-3">LAP {lapA.lapNumber} / {lapB.lapNumber}</span>
           </div>
           <div className="aspect-[4/3]">
             <TrackView circuit={circuit} ghosts={ghosts} player={player} />
@@ -289,7 +294,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
             <SectionLabel>GAP AT CAR {driverA.name_acronym}</SectionLabel>
             <div className="mt-2 font-mono text-[52px] font-bold leading-none tabular-nums">
               <span ref={gapRef}>+0.000</span>
-              <span className="ml-1.5 text-lg font-normal text-fog-500">s</span>
+              <span className="ml-1.5 text-lg font-normal text-ink-3">s</span>
             </div>
             <div className="mt-5 space-y-2.5">
               {[
@@ -299,7 +304,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
                 <div key={d.driver_number} className="flex items-center gap-2.5">
                   <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: color }} />
                   <span className="text-[13px] font-semibold">{d.name_acronym}</span>
-                  <span className="truncate text-[11px] text-fog-500">{d.team_name}</span>
+                  <span className="truncate text-[11px] text-ink-3">{d.team_name}</span>
                   <span className="ml-auto font-mono text-[13px] tabular-nums">{fmtLap(lap.lapDuration)}</span>
                 </div>
               ))}
@@ -311,7 +316,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
             <div className="mt-3.5 flex items-center gap-2">
               <button
                 onClick={() => player.toggle()}
-                className="chamfer h-9 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
+                className="h-9 bg-ink px-5 text-[13px] font-semibold text-paper transition-colors hover:bg-red"
               >
                 {playing ? "Pause" : "Play"}
               </button>
@@ -323,13 +328,13 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
                     setSpeedState(s);
                   }}
                   className={`h-9 px-2.5 font-mono text-[12px] transition-colors ${
-                    speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"
+                    speed === s ? "bg-paper-3 text-ink" : "text-ink-3 hover:text-ink"
                   }`}
                 >
                   {s}×
                 </button>
               ))}
-              <span ref={clockRef} className="ml-auto font-mono text-[13px] tabular-nums text-fog-300">0:00.000</span>
+              <span ref={clockRef} className="ml-auto font-mono text-[13px] tabular-nums text-ink-2">0:00.000</span>
             </div>
             <input
               ref={scrubRef}
@@ -339,7 +344,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
               step={0.01}
               defaultValue={0}
               onInput={(e) => player.seek(Number(e.currentTarget.value))}
-              className="mt-4 w-full accent-neon-cyan"
+              className="mt-4 w-full"
             />
           </Panel>
 
@@ -360,7 +365,7 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
                 rows={sectorRows}
               />
             </div>
-            <div className="mt-2 space-y-2 border-t border-ink-700/50 px-3 pb-3 pt-3">
+            <div className="mt-2 space-y-2 border-t border-ink/10 px-3 pb-3 pt-3">
               {[
                 { d: driverA, lap: lapA, color: colorA },
                 { d: driverB, lap: lapB, color: colorB },

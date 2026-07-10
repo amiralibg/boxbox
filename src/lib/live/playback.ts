@@ -49,9 +49,11 @@ export class LivePlayback {
   }
 
   /**
-   * Smooth playback clock. Advances at `speed`× real time, clamped to the
-   * newest buffered frame; if a slow poll left us more than an extra lag
-   * behind, jump forward instead of drifting ever further from live.
+   * Smooth playback clock. Advances at `speed`× real time, modulated by how
+   * much buffered data is ahead: a draining buffer slows playback (down to
+   * 0.7×) instead of freezing against the newest frame, an over-full one
+   * creeps faster (up to 1.1×) until the lag is restored. Teleporting is
+   * reserved for a feed that died and came back.
    */
   now(): number {
     const wall = performance.now() / 1000;
@@ -61,12 +63,19 @@ export class LivePlayback {
       this.anchorWall = wall;
       return target;
     }
-    let t = this.anchorT + (wall - this.anchorWall) * this.speed;
-    if (t > this.latestT) t = this.latestT;
-    else if (target - t > this.lagS) t = target;
+    const headroom = this.latestT - this.anchorT;
+    const rate = this.speed * Math.min(1.1, Math.max(0.7, headroom / this.lagS));
+    let t = this.anchorT + (wall - this.anchorWall) * rate;
+    if (t > this.latestT) t = this.latestT; // absolute floor: never pass the data
+    if (target - t > 3 * this.lagS) t = target; // feed died and recovered — jump
     this.anchorT = t;
     this.anchorWall = wall;
     return t;
+  }
+
+  /** session-seconds of buffered data ahead of the playback clock */
+  get bufferS(): number {
+    return this.anchorT < 0 ? 0 : Math.max(0, this.latestT - this.anchorT);
   }
 
   /** interpolated position at session time t; null before the first sample */

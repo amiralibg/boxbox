@@ -6,17 +6,28 @@
  * same standalone SVG through an <img> + canvas at `scale`×.
  */
 
+const FONTS = [
+  { file: "/fonts/fraunces.woff2", family: "Fraunces", weight: "100 900", style: "normal" },
+  { file: "/fonts/fraunces-italic.woff2", family: "Fraunces", weight: "100 900", style: "italic" },
+  { file: "/fonts/jetbrains-mono.woff2", family: "JetBrains Mono", weight: "400 700", style: "normal" },
+];
+
 let fontCss: string | null = null;
 
 async function embeddedFontCss(): Promise<string> {
   if (fontCss) return fontCss;
-  const buf = await (await fetch("/fonts/space-grotesk.woff2")).arrayBuffer();
-  let bin = "";
-  const bytes = new Uint8Array(buf);
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  fontCss = `@font-face{font-family:'Space Grotesk';font-weight:300 700;src:url(data:font/woff2;base64,${btoa(bin)}) format('woff2');}`;
+  const faces = await Promise.all(
+    FONTS.map(async (f) => {
+      const buf = await (await fetch(f.file)).arrayBuffer();
+      let bin = "";
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      return `@font-face{font-family:'${f.family}';font-style:${f.style};font-weight:${f.weight};src:url(data:font/woff2;base64,${btoa(bin)}) format('woff2');}`;
+    }),
+  );
+  fontCss = faces.join("");
   return fontCss;
 }
 

@@ -19,11 +19,11 @@ const COUNTRY_CODES: Record<string, string> = {
 const countryCode = (name: string) => COUNTRY_CODES[name] ?? name.slice(0, 3).toUpperCase();
 
 const ACCENTS = [
-  { name: "Cyan", value: "#2de2e6" },
-  { name: "Magenta", value: "#ff2d78" },
-  { name: "Violet", value: "#a06cff" },
-  { name: "Amber", value: "#ffb02e" },
-  { name: "Green", value: "#3ff5a0" },
+  { name: "Racing red", value: "#c8102e" },
+  { name: "Ink", value: "#1c1710" },
+  { name: "Blue", value: "#1e5aa8" },
+  { name: "Green", value: "#1a7f4e" },
+  { name: "Ochre", value: "#a07d00" },
 ];
 
 export default function PosterPage() {
@@ -69,13 +69,12 @@ export default function PosterPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <div className="flex flex-col gap-8 lg:flex-row lg:gap-10">
+      <PageTitle index="01" title="Circuit posters" sub="Official live-timing geometry, 2025 calendar. Print-ready SVG or PNG." />
+      <div className="mt-6 flex flex-col gap-8 md:mt-8 lg:flex-row lg:gap-10">
         {/* controls */}
         <aside className="w-full shrink-0 lg:w-[300px]">
-          <PageTitle index="01" title="Circuit posters" sub="Official live-timing geometry, 2025 calendar. Print-ready SVG or PNG." />
-
-          <Panel className="mt-6">
-            <div className="border-b border-ink-700/70 px-4 py-3">
+          <Panel>
+            <div className="border-b border-ink/15 px-4 py-3">
               <SectionLabel accent={accent}>CIRCUIT — {String(index.length).padStart(2, "0")} TRACKS</SectionLabel>
             </div>
             <div className="panel-scroll max-h-[340px] overflow-y-auto">
@@ -83,13 +82,13 @@ export default function PosterPage() {
                 <button
                   key={c.slug}
                   onClick={() => setSlug(c.slug)}
-                  className={`flex w-full items-baseline gap-3 border-b border-ink-700/40 px-4 py-2.5 text-left text-[13px] transition-colors last:border-b-0 ${
-                    c.slug === slug ? "bg-ink-700/70 text-fog-100" : "text-fog-300 hover:bg-ink-800 hover:text-fog-100"
+                  className={`flex w-full items-baseline gap-3 border-b border-ink/10 px-4 py-2.5 text-left text-[13px] transition-colors last:border-b-0 ${
+                    c.slug === slug ? "bg-paper-3 text-ink" : "text-ink-2 hover:bg-paper-2 hover:text-ink"
                   }`}
                 >
-                  <span className="w-6 shrink-0 font-mono text-[11px] text-fog-500">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="w-6 shrink-0 font-mono text-[11px] text-ink-3">{String(i + 1).padStart(2, "0")}</span>
                   <span className="truncate">{c.shortName}</span>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] tracking-wider text-fog-500">{countryCode(c.country)}</span>
+                  <span className="ml-auto shrink-0 font-mono text-[10px] tracking-wider text-ink-3">{countryCode(c.country)}</span>
                 </button>
               ))}
               {index.length === 0 && !error && (
@@ -110,8 +109,8 @@ export default function PosterPage() {
                   key={a.value}
                   title={a.name}
                   onClick={() => setAccent(a.value)}
-                  className={`h-8 w-8 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fog-100 ${
-                    accent === a.value ? "ring-2 ring-fog-100 ring-offset-2 ring-offset-ink-950" : ""
+                  className={`h-8 w-8 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
+                    accent === a.value ? "ring-2 ring-ink ring-offset-2 ring-offset-paper" : ""
                   }`}
                   style={{ backgroundColor: a.value }}
                 />
@@ -119,7 +118,7 @@ export default function PosterPage() {
             </div>
           </div>
 
-          <label className="mt-6 flex cursor-pointer items-center gap-3 text-[13px] text-fog-300">
+          <label className="mt-6 flex cursor-pointer items-center gap-3 text-[13px] text-ink-2">
             <input type="checkbox" checked={showCorners} onChange={(e) => setShowCorners(e.target.checked)} className="box" />
             Corner numbers
           </label>
@@ -128,21 +127,21 @@ export default function PosterPage() {
             <button
               onClick={() => onExport("svg")}
               disabled={!circuit || exporting !== null}
-              className="h-10 flex-1 border border-ink-600 bg-ink-800 text-[13px] font-medium tracking-wide transition-colors hover:border-fog-500/50 hover:bg-ink-700 disabled:opacity-40"
+              className="h-10 flex-1 border border-ink/25 text-[13px] font-medium tracking-wide text-ink-2 transition-colors hover:border-ink/60 hover:text-ink disabled:opacity-40"
             >
               {exporting === "svg" ? "Exporting…" : "SVG"}
             </button>
             <button
               onClick={() => onExport("png")}
               disabled={!circuit || exporting !== null}
-              className="chamfer h-10 flex-1 bg-neon-cyan text-[13px] font-bold tracking-wide text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+              className="h-10 flex-1 bg-ink text-[13px] font-semibold tracking-wide text-paper transition-colors hover:bg-red disabled:opacity-40"
             >
               {exporting === "png" ? "Exporting…" : "PNG 2×"}
             </button>
           </div>
 
           {error && (
-            <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+            <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
           )}
         </aside>
 
@@ -150,7 +149,7 @@ export default function PosterPage() {
         <section className="flex min-w-0 flex-1 items-start justify-center">
           <div
             ref={svgHost}
-            className="w-full max-w-[560px] overflow-hidden border border-ink-700/70 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+            className="w-full max-w-[560px] overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_rgba(28,23,16,0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
           >
             {circuit ? (
               <Poster circuit={circuit} accent={accent} showCorners={showCorners} round={round > 0 ? round : undefined} />

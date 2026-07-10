@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { setTheme, useTheme } from "@/lib/theme";
 
 const LINKS = [
   { href: "/poster", label: "Posters" },
@@ -13,6 +14,23 @@ const LINKS = [
   { href: "/live", label: "Live" },
 ];
 
+/** Masthead-style theme switch: two words, the active one in full ink. */
+function ThemeToggle({ className = "" }: { className?: string }) {
+  const theme = useTheme();
+  return (
+    <button
+      onClick={() => setTheme(theme === "dark" ? "paper" : "dark")}
+      aria-label="Switch theme"
+      className={`font-mono text-[10px] tracking-[0.3em] ${className}`}
+    >
+      <span className={theme === "paper" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>PAPER</span>
+      <span className="text-ink-3"> / </span>
+      <span className={theme === "dark" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>NIGHT</span>
+    </button>
+  );
+}
+
+/** Masthead: serif logotype, small-caps contents, newspaper double rule below. */
 export function SiteNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -28,33 +46,32 @@ export function SiteNav() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-ink-700/70 bg-ink-950/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-8 px-5 md:px-6">
-        <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
-          <span className="block h-2.5 w-2.5 bg-neon-cyan" />
-          <span className="text-sm font-bold tracking-[0.25em]">BOXBOX</span>
+    <header className="sticky top-0 z-50 bg-paper/95 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-10 px-5 md:px-8">
+        <Link href="/" className="display text-[22px] font-black leading-none" onClick={() => setOpen(false)}>
+          BoxBox<span className="text-red">.</span>
         </Link>
 
         {/* desktop */}
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           {LINKS.map((l) => {
             const active = pathname.startsWith(l.href);
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`relative px-3 py-[17px] text-[13px] tracking-wide transition-colors ${
-                  active ? "text-fog-100" : "text-fog-500 hover:text-fog-300"
+                className={`relative py-[22px] text-[12px] font-medium uppercase tracking-[0.14em] transition-colors ${
+                  active ? "text-ink" : "text-ink-3 hover:text-ink"
                 }`}
               >
                 {l.label}
-                {active && <span className="absolute inset-x-3 bottom-0 h-[2px] bg-neon-cyan" />}
+                {active && <span className="absolute inset-x-0 bottom-[10px] h-[2px] bg-red" />}
               </Link>
             );
           })}
         </nav>
 
-        <span className="ml-auto hidden font-mono text-[10px] tracking-[0.3em] text-fog-500 md:block">F1 RACE LAB</span>
+        <ThemeToggle className="ml-auto hidden md:block" />
 
         {/* mobile burger */}
         <button
@@ -63,30 +80,36 @@ export function SiteNav() {
           aria-expanded={open}
           className="ml-auto flex h-9 w-9 flex-col items-center justify-center gap-[5px] md:hidden"
         >
-          <span className={`h-[2px] w-5 bg-fog-100 transition-transform ${open ? "translate-y-[7px] rotate-45" : ""}`} />
-          <span className={`h-[2px] w-5 bg-fog-100 transition-opacity ${open ? "opacity-0" : ""}`} />
-          <span className={`h-[2px] w-5 bg-fog-100 transition-transform ${open ? "-translate-y-[7px] -rotate-45" : ""}`} />
+          <span className={`h-[2px] w-5 bg-ink transition-transform ${open ? "translate-y-[7px] rotate-45" : ""}`} />
+          <span className={`h-[2px] w-5 bg-ink transition-opacity ${open ? "opacity-0" : ""}`} />
+          <span className={`h-[2px] w-5 bg-ink transition-transform ${open ? "-translate-y-[7px] -rotate-45" : ""}`} />
         </button>
+      </div>
+      <div className="mx-auto max-w-6xl px-5 md:px-8">
+        <div className="rule-double pb-[5px]" />
       </div>
 
       {/* mobile sheet */}
       {open && (
-        <nav className="fixed inset-x-0 bottom-0 top-14 z-50 flex flex-col bg-ink-950/98 px-6 pt-6 backdrop-blur md:hidden">
+        <nav className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col bg-paper px-6 pt-6 md:hidden">
           {LINKS.map((l, i) => {
             const active = pathname.startsWith(l.href);
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`flex items-baseline gap-4 border-b border-ink-700/60 py-5 ${active ? "text-fog-100" : "text-fog-300"}`}
+                className={`flex items-baseline gap-4 border-b border-ink/15 py-5 ${active ? "text-ink" : "text-ink-2"}`}
               >
-                <span className="w-8 font-mono text-[11px] text-fog-500">{String(i + 1).padStart(2, "0")}</span>
-                <span className="text-xl font-bold tracking-tight">{l.label}</span>
-                {active && <span className="ml-auto h-2 w-2 bg-neon-cyan" />}
+                <span className="w-8 font-mono text-[11px] text-red">{String(i + 1).padStart(2, "0")}</span>
+                <span className="display text-2xl font-bold">{l.label}</span>
+                {active && <span className="ml-auto h-2 w-2 bg-red" />}
               </Link>
             );
           })}
-          <span className="mt-auto pb-8 pt-6 font-mono text-[10px] tracking-[0.3em] text-fog-500">F1 RACE LAB</span>
+          <div className="mt-auto flex items-baseline justify-between pb-8 pt-6">
+            <span className="font-mono text-[10px] tracking-[0.3em] text-ink-3">F1 RACE LAB</span>
+            <ThemeToggle />
+          </div>
         </nav>
       )}
     </header>

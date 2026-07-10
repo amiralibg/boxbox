@@ -11,11 +11,11 @@ import { downloadPng, downloadSvg } from "@/lib/export";
 
 const YEARS = Array.from({ length: 2026 - 1950 + 1 }, (_, i) => 2026 - i);
 const ACCENTS = [
-  { name: "Cyan", value: "#2de2e6" },
-  { name: "Magenta", value: "#ff2d78" },
-  { name: "Violet", value: "#a06cff" },
-  { name: "Amber", value: "#ffb02e" },
-  { name: "Green", value: "#3ff5a0" },
+  { name: "Racing red", value: "#c8102e" },
+  { name: "Ink", value: "#1c1710" },
+  { name: "Blue", value: "#1e5aa8" },
+  { name: "Green", value: "#1a7f4e" },
+  { name: "Ochre", value: "#a07d00" },
 ];
 
 export default function RecapPage() {
@@ -77,7 +77,7 @@ export default function RecapPage() {
       <PageTitle index="05" title="Recap" sub="Any driver, any season since 1950 — one shareable card." />
 
       {error && (
-        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
       {!ready && !error && (
         <div className="mt-8">
@@ -110,7 +110,7 @@ export default function RecapPage() {
                   title={a.name}
                   onClick={() => setAccent(a.value)}
                   className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${
-                    accent === a.value ? "ring-2 ring-fog-100 ring-offset-2 ring-offset-ink-950" : ""
+                    accent === a.value ? "ring-2 ring-ink ring-offset-2 ring-offset-paper" : ""
                   }`}
                   style={{ backgroundColor: a.value }}
                 />
@@ -120,14 +120,14 @@ export default function RecapPage() {
               <button
                 onClick={() => onExport("svg")}
                 disabled={!data || exporting !== null}
-                className="h-10 border border-ink-600 bg-ink-800 px-4 text-[13px] font-medium transition-colors hover:border-fog-500/50 disabled:opacity-40"
+                className="h-10 border border-ink/25 px-4 text-[13px] font-medium text-ink-2 transition-colors hover:border-ink/60 hover:text-ink disabled:opacity-40"
               >
                 {exporting === "svg" ? "Exporting…" : "SVG"}
               </button>
               <button
                 onClick={() => onExport("png")}
                 disabled={!data || exporting !== null}
-                className="chamfer h-10 bg-neon-cyan px-4 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+                className="h-10 bg-ink px-4 text-[13px] font-semibold text-paper transition-colors hover:bg-red disabled:opacity-40"
               >
                 {exporting === "png" ? "Exporting…" : "PNG 2×"}
               </button>
@@ -136,7 +136,7 @@ export default function RecapPage() {
 
           <div
             ref={svgHost}
-            className="recap-host mt-6 overflow-hidden border border-ink-700/70 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+            className="recap-host mt-6 overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_rgba(28,23,16,0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
           >
             {data ? (
               <RecapCard key={`${data.driverId}-${data.year}-${accent}`} data={data} accent={accent} />

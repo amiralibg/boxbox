@@ -2,8 +2,11 @@ import type { DriverInfo, SessionInfo } from "@/lib/telemetry/types";
 import type { LiveFeed, LiveFrame, LiveMeta } from "@/lib/live/types";
 
 const POLL_MS = 4000;
-/** session-time frame grid emitted to clients — near OpenF1's native ~3.8 Hz */
-const FRAME_HZ = 4;
+/** how far the real-time window trails the wall clock — the free API publishes
+ * data a few seconds late, so chasing "now" only produces permanent gaps */
+const DELAY_S = 5;
+/** location samples are bucketed to this grid only to merge simultaneous rows */
+const BUCKET_S = 0.01;
 
 interface LocationRow {
   date: string;
@@ -26,9 +29,9 @@ interface IntervalRow {
 
 /**
  * DelayedRestFeed — the free-tier LiveFeed. Polls OpenF1 REST for everything
- * newer than the last poll and emits the window resampled onto a uniform
- * FRAME_HZ grid — many small frames per cycle, so clients can buffer and
- * interpolate smooth motion instead of tweening one big jump per poll.
+ * newer than the last returned sample and emits one frame per source sample
+ * timestamp — clients buffer and interpolate through the true sample times,
+ * so motion carries OpenF1's native cadence instead of a resampled step grid.
  *
  * During a genuinely live session the free API trails realtime by a little —
  * that's the "delayed" in the name. With `simulate`, the clock is remapped so
@@ -49,8 +52,6 @@ export class DelayedRestFeed implements LiveFeed {
   private startedAt = 0;
   private polling = false;
   private seeded = false;
-  /** last known position per driver — carried across polls so quiet cars stay on track */
-  private lastPos = new Map<number, { t: number; x: number; y: number }>();
 
   constructor(
     private sessionKey: number,
@@ -91,7 +92,7 @@ export class DelayedRestFeed implements LiveFeed {
   /** session-relative seconds of "now" (remapped when simulating) */
   private virtualNow(): number {
     if (this.simulate) return ((Date.now() - this.startedAt) / 1000) * this.speed;
-    return (Date.now() - this.t0) / 1000;
+    return (Date.now() - this.t0) / 1000 - DELAY_S;
   }
 
   private iso(t: number): string {
@@ -116,60 +117,40 @@ export class DelayedRestFeed implements LiveFeed {
         this.fetchJson<IntervalRow[]>("intervals", windowQ).catch(() => [] as IntervalRow[]),
       ]);
       this.seeded = true;
-      this.lastT = now;
 
-      // per-driver location samples, session-relative time, in date order
-      const samples = new Map<number, { t: number; x: number; y: number }[]>();
+      // one frame per source sample bucket, keyed by true timestamp — clients
+      // interpolate between real sample times, no server-side resampling
+      const byBucket = new Map<number, LiveFrame>();
+      let newest = -Infinity;
+      const frameAt = (t: number): LiveFrame => {
+        const key = Math.round(t / BUCKET_S);
+        let f = byBucket.get(key);
+        if (!f) byBucket.set(key, (f = { t: key * BUCKET_S, cars: {} }));
+        return f;
+      };
+
       for (const row of locations) {
         if (row.x === 0 && row.y === 0) continue;
         const t = (Date.parse(row.date) - this.t0) / 1000;
-        let arr = samples.get(row.driver_number);
-        if (!arr) samples.set(row.driver_number, (arr = []));
-        arr.push({ t, x: row.x, y: row.y });
+        newest = Math.max(newest, t);
+        frameAt(t).cars[row.driver_number] = { x: row.x, y: row.y };
       }
-
-      // resample the window onto the uniform frame grid (hold-last per driver)
-      const step = 1 / FRAME_HZ;
-      const firstT = Math.floor(from / step) * step + step;
-      const frames: LiveFrame[] = [];
-      const cursors = new Map<number, number>();
-      for (let t = firstT; t <= now + 1e-9; t += step) {
-        for (const [num, arr] of samples) {
-          let i = cursors.get(num) ?? 0;
-          while (i < arr.length && arr[i].t <= t) {
-            this.lastPos.set(num, arr[i]);
-            i++;
-          }
-          cursors.set(num, i);
-        }
-        const cars: LiveFrame["cars"] = {};
-        for (const [num, p] of this.lastPos) cars[num] = { x: p.x, y: p.y };
-        frames.push({ t, cars });
-      }
-      if (frames.length === 0) return;
-
-      // attach order/gap changes to the frame whose grid time they fall on
-      const frameIdx = (t: number) =>
-        Math.min(frames.length - 1, Math.max(0, Math.ceil((t - firstT) / step)));
-      const orderPerFrame = new Map<number, Map<number, number>>();
       for (const p of positions) {
-        const idx = frameIdx((Date.parse(p.date) - this.t0) / 1000);
-        let m = orderPerFrame.get(idx);
-        if (!m) orderPerFrame.set(idx, (m = new Map()));
-        m.set(p.driver_number, p.position);
+        const f = frameAt((Date.parse(p.date) - this.t0) / 1000);
+        (f.order ??= []).push({ num: p.driver_number, pos: p.position });
       }
-      for (const [idx, m] of orderPerFrame) {
-        frames[idx].order = [...m].map(([num, pos]) => ({ num, pos }));
-      }
-      const gapsPerFrame = new Map<number, LiveFrame["gaps"]>();
       for (const i of intervals) {
-        const idx = frameIdx((Date.parse(i.date) - this.t0) / 1000);
-        const g = gapsPerFrame.get(idx) ?? {};
-        g[i.driver_number] = typeof i.gap_to_leader === "number" ? i.gap_to_leader : null;
-        gapsPerFrame.set(idx, g);
+        const f = frameAt((Date.parse(i.date) - this.t0) / 1000);
+        (f.gaps ??= {})[i.driver_number] = typeof i.gap_to_leader === "number" ? i.gap_to_leader : null;
       }
-      for (const [idx, g] of gapsPerFrame) frames[idx].gaps = g;
 
+      // advance the window to the newest LOCATION sample actually returned —
+      // chasing the wall clock instead permanently drops whatever hadn't been
+      // published yet. (Sparser position/interval rows may be re-fetched by the
+      // overlapping window; the client applies them idempotently.)
+      this.lastT = Number.isFinite(newest) ? Math.max(from, newest) : Math.max(from, now - 10);
+
+      const frames = [...byBucket.values()].sort((a, b) => a.t - b.t);
       for (const frame of frames) for (const cb of this.subs) cb(frame);
 
       if (now >= this.tEnd) {

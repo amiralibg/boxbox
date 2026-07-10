@@ -6,9 +6,8 @@ import { buildDeltaProfile } from "@/lib/telemetry/delta";
 import { sampleLap, timeAtDistance } from "@/lib/telemetry/sample";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
 import type { BakedLap } from "@/lib/telemetry/types";
+import { chartPalette, useTheme } from "@/lib/theme";
 
-const GRID = "#1a1a26";
-const AXIS = "#7e7c92";
 const FONT = "11px 'Space Grotesk', sans-serif";
 const POINTS = 600;
 
@@ -39,6 +38,7 @@ interface ChartSpec {
  */
 export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const theme = useTheme();
 
   const prepared = useMemo(() => {
     // match samples by lap-progress fraction (see buildDeltaProfile)
@@ -57,6 +57,7 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
     const host = hostRef.current;
     if (!host) return;
     host.innerHTML = "";
+    const pal = chartPalette();
     const plots: uPlot[] = [];
     const { s, atA, atB, delta } = prepared;
 
@@ -69,10 +70,10 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
     });
 
     const axisBase: uPlot.Axis = {
-      stroke: AXIS,
+      stroke: pal.axis,
       font: FONT,
-      grid: { stroke: GRID, width: 1 },
-      ticks: { stroke: GRID, width: 1 },
+      grid: { stroke: pal.grid, width: 1 },
+      ticks: { stroke: pal.grid, width: 1 },
     };
 
     const specs: ChartSpec[] = [
@@ -107,7 +108,7 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
         showX: true,
         zeroLine: true,
         data: [delta.s, delta.delta],
-        series: [{}, mkSeries("Δ", "#eceaf6")],
+        series: [{}, mkSeries("Δ", pal.ink)],
       },
     ];
 
@@ -115,10 +116,10 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
 
     for (const spec of specs) {
       const wrap = document.createElement("div");
-      wrap.className = "border-b border-ink-700/50 last:border-b-0";
+      wrap.className = "border-b border-ink/10 last:border-b-0";
       const head = document.createElement("div");
       head.className = "flex items-baseline justify-between px-1 pt-3";
-      head.innerHTML = `<span class="text-[11px] font-medium tracking-[0.18em] text-fog-500">${spec.title}</span><span class="readout font-mono text-[11px] text-fog-300"></span>`;
+      head.innerHTML = `<span class="text-[11px] font-medium tracking-[0.18em] text-ink-3">${spec.title}</span><span class="readout font-mono text-[11px] text-ink-2"></span>`;
       wrap.appendChild(head);
       host.appendChild(wrap);
       const readout = head.querySelector<HTMLElement>(".readout")!;
@@ -131,7 +132,7 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
             const cx = u.valToPos(d, "x", true);
             const ctx = u.ctx;
             ctx.save();
-            ctx.strokeStyle = "#eceaf6";
+            ctx.strokeStyle = pal.ink;
             ctx.globalAlpha = 0.45;
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -221,7 +222,7 @@ export function GhostCharts({ lapA, lapB, colorA, colorB, labelA, labelB, player
       for (const u of plots) u.destroy();
       host.innerHTML = "";
     };
-  }, [prepared, colorA, colorB, labelA, labelB, player, lapA]);
+  }, [prepared, colorA, colorB, labelA, labelB, player, lapA, theme]);
 
   return <div ref={hostRef} />;
 }

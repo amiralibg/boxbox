@@ -8,6 +8,7 @@ import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Sect
 import { Select } from "@/components/ui/Select";
 import { compoundStyle, SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { teamColor } from "@/lib/color";
+import { useTheme } from "@/lib/theme";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
 import { gapAt, orderAt, type ReplayBlob, type ReplayLap } from "@/lib/replay/types";
@@ -127,7 +128,7 @@ export default function ReplayPage() {
       </Panel>
 
       {error && (
-        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
 
       {loading && !blob && <StageSkeleton label="BAKING SESSION" note="20 CARS · 2 HZ" sidebarRows={12} />}
@@ -153,11 +154,12 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
   const clockRef = useRef<HTMLSpanElement>(null);
   const scrubRef = useRef<HTMLInputElement>(null);
 
+  const theme = useTheme();
   const colors = useMemo(() => {
     const m = new Map<number, string>();
-    for (const d of blob.drivers) m.set(d.num, teamColor(d.colour));
+    for (const d of blob.drivers) m.set(d.num, teamColor(d.colour, theme));
     return m;
-  }, [blob]);
+  }, [blob, theme]);
 
   const dashed = useMemo(() => {
     const seen = new Set<string>();
@@ -217,7 +219,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
           <Panel className="overflow-hidden">
             <div className="flex items-baseline justify-between px-4 pt-4">
               <SectionLabel>{circuit.name.toUpperCase()} — {blob.sessionName.toUpperCase()}</SectionLabel>
-              <span className="font-mono text-[11px] text-fog-500">{blob.drivers.length} CARS</span>
+              <span className="font-mono text-[11px] text-ink-3">{blob.drivers.length} CARS</span>
             </div>
             <div className="aspect-[4/3]">
               <ReplayTrack circuit={circuit} blob={blob} colors={colors} player={player} highlight={highlight} />
@@ -228,7 +230,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => player.toggle()}
-                className="chamfer h-9 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85"
+                className="h-9 bg-ink px-5 text-[13px] font-semibold text-paper transition-colors hover:bg-red"
               >
                 {playing ? "Pause" : "Play"}
               </button>
@@ -240,14 +242,14 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
                     setSpeedState(s);
                   }}
                   className={`h-9 px-2.5 font-mono text-[12px] transition-colors ${
-                    speed === s ? "bg-ink-600 text-fog-100" : "text-fog-500 hover:text-fog-100"
+                    speed === s ? "bg-paper-3 text-ink" : "text-ink-3 hover:text-ink"
                   }`}
                 >
                   {s}×
                 </button>
               ))}
-              <span className="ml-auto hidden text-[10px] tracking-[0.2em] text-fog-500 sm:block">SESSION CLOCK</span>
-              <span ref={clockRef} className="font-mono text-[13px] tabular-nums text-fog-100">0:00:00</span>
+              <span className="ml-auto hidden text-[10px] tracking-[0.2em] text-ink-3 sm:block">SESSION CLOCK</span>
+              <span ref={clockRef} className="font-mono text-[13px] tabular-nums text-ink">0:00:00</span>
             </div>
             <input
               ref={scrubRef}
@@ -257,13 +259,13 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               step={1}
               defaultValue={0}
               onInput={(e) => player.seek(Number(e.currentTarget.value))}
-              className="mt-3.5 w-full accent-neon-cyan"
+              className="mt-3.5 w-full"
             />
           </Panel>
         </div>
 
         <Panel className="panel-scroll max-h-[560px] overflow-y-auto lg:max-h-none">
-          <div className="sticky top-0 z-10 border-b border-ink-700/70 bg-ink-900 px-4 py-3">
+          <div className="sticky top-0 z-10 border-b border-ink/15 bg-paper px-4 py-3">
             <SectionLabel>RUNNING ORDER</SectionLabel>
           </div>
           {rows.map((r) => {
@@ -274,20 +276,20 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
               <button
                 key={r.num}
                 onClick={() => toggleHl(r.num)}
-                className={`flex w-full items-center gap-2.5 border-b border-ink-700/40 px-4 py-[7px] text-left transition-colors last:border-b-0 ${
-                  active ? "bg-ink-700/70" : "hover:bg-ink-800"
+                className={`flex w-full items-center gap-2.5 border-b border-ink/10 px-4 py-[7px] text-left transition-colors last:border-b-0 ${
+                  active ? "bg-paper-3" : "hover:bg-paper-2"
                 }`}
               >
-                <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-fog-500">{r.pos}</span>
+                <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-ink-3">{r.pos}</span>
                 <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: colors.get(r.num) }} />
                 <span className="text-[13px] font-semibold">{d.acronym}</span>
-                <span className="ml-auto font-mono text-[12px] tabular-nums text-fog-300">
+                <span className="ml-auto font-mono text-[12px] tabular-nums text-ink-2">
                   {r.pos === 1 ? "LEADER" : r.gap != null ? `+${r.gap.toFixed(1)}` : "—"}
                 </span>
               </button>
             );
           })}
-          {rows.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-fog-500">Scrub into the session…</div>}
+          {rows.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-ink-3">Scrub into the session…</div>}
         </Panel>
       </div>
 
@@ -306,7 +308,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
         <Panel className="mt-5 px-4 pb-4 pt-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <SectionLabel>TYRE STRATEGY</SectionLabel>
-            <div className="flex items-center gap-3 font-mono text-[10px] text-fog-500">
+            <div className="flex items-center gap-3 font-mono text-[10px] text-ink-3">
               {(["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"] as const).map((c) => (
                 <span key={c} className="flex items-center gap-1">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: compoundStyle(c).color }} />
@@ -333,7 +335,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
                           <div
                             key={i}
                             title={`${s.compound ?? "?"} · L${s.lapStart}–${s.lapEnd}${s.tyreAge ? ` · ${s.tyreAge} laps old` : ""}`}
-                            className="flex items-center justify-center font-mono text-[9px] font-bold text-ink-950"
+                            className="flex items-center justify-center font-mono text-[9px] font-bold text-paper"
                             style={{ width: `${(laps / totalLaps) * 100}%`, backgroundColor: style.color, minWidth: 14 }}
                           >
                             {laps >= 4 ? laps : ""}
@@ -427,7 +429,7 @@ function DriverLapsPanel({ blob, colors, defaultNum }: { blob: ReplayBlob; color
               key={d.num}
               onClick={() => setNum(d.num)}
               className={`px-2 py-1 font-mono text-[10px] font-semibold transition-colors ${
-                d.num === num ? "bg-ink-600" : "hover:bg-ink-800"
+                d.num === num ? "bg-paper-3" : "hover:bg-paper-2"
               }`}
               style={{ color: colors.get(d.num) }}
             >

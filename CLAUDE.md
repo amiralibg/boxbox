@@ -14,6 +14,27 @@ never relitigate them.
 - **Phase 5 (recap generator): DONE.** `/recap` route.
 - **Phase 6 (live mode): DONE.** `/live` route. ALL SPEC PHASES COMPLETE.
 
+## Redesign (2026-07): print editorial
+
+- Replaced the dark ink/neon theme with a print-editorial system: warm paper
+  ground (`paper/-2/-3`), warm ink text scale (`ink/-2/-3`), one racing-red
+  accent (`red`, `red-deep`), support hues (`green/ochre/blue`) for status.
+  Tokens in `globals.css` `@theme`; hairline rules via `border-ink/10..30`.
+- Type: Fraunces variable (display serif, `.display` sets opsz 144) +
+  Space Grotesk (UI sans) + JetBrains Mono (timing figures). Fraunces
+  normal+italic self-hosted in `public/fonts/`. № glyph is NOT in the mono
+  subset — use `Nº` (U+00BA).
+- `teamColor()` now DARKENS bright team colours (luminance ≤ 0.38) for the
+  light background — the old version lifted dark ones. Fallbacks are ink/red.
+- Poster + RecapCard are paper SVGs; ExportLayer embeds Fraunces (both styles)
+  + JetBrains Mono as base64. Sector/tyre conventions remapped for paper
+  (purple 6d28d9, green 1a7f4e, yellow a07d00).
+- Track canvases: paper-3 bed + ink hairline; chart chrome GRID #e2dac2,
+  AXIS #8d8470, playhead ink.
+- Home page is a real front page (masthead + contents), no longer a redirect.
+- GOTCHA: Turbopack served stale CSS after the token rename — `rm -rf .next`
+  if theme edits don't show up in dev.
+
 ## Phase 6 decisions
 
 - `LiveFeed` interface in `src/lib/live/types.ts` (frames: t + car xy + optional

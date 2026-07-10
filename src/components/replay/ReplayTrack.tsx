@@ -5,6 +5,7 @@ import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit } from "@/lib/track/geometry";
 import { sampleXY, type ReplayBlob } from "@/lib/replay/types";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
+import { chartPalette } from "@/lib/theme";
 
 /**
  * All-cars track canvas. Same pattern as the ghost TrackView: static track
@@ -52,13 +53,14 @@ export function ReplayTrack({
     const draw = (t: number) => {
       if (!projector || !trackPath) return;
       const hl = highlight;
+      const pal = chartPalette();
       ctx.clearRect(0, 0, w, h);
       ctx.lineJoin = "round";
-      ctx.strokeStyle = "#23232f";
+      ctx.strokeStyle = pal.trackBed;
       ctx.lineWidth = 10;
       ctx.stroke(trackPath);
-      ctx.strokeStyle = "#3a3a4a";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = pal.inkFaint;
+      ctx.lineWidth = 1.25;
       ctx.stroke(trackPath);
 
       const dimOthers = hl.size > 0;
@@ -68,7 +70,7 @@ export function ReplayTrack({
         const retired = t > ch.lastT + 30;
         const [rx, ry] = sampleXY(ch, blob.hz, Math.min(t, ch.lastT));
         const [px, py] = projector.project([rx, ry]);
-        const color = colors.get(d.num) ?? "#7e7c92";
+        const color = colors.get(d.num) ?? pal.axis;
         const focused = hl.has(d.num);
         const alpha = retired ? 0.15 : dimOthers && !focused ? 0.25 : 1;
 

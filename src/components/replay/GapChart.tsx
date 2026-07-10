@@ -4,9 +4,8 @@ import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import { type ReplayBlob } from "@/lib/replay/types";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
+import { chartPalette, useTheme } from "@/lib/theme";
 
-const GRID = "#1a1a26";
-const AXIS = "#7e7c92";
 const FONT = "11px 'Space Grotesk', sans-serif";
 
 const fmtClock = (s: number) => {
@@ -35,10 +34,12 @@ export function GapChart({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const hlRef = useRef(highlight);
+  const theme = useTheme();
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const pal = chartPalette();
     const withGaps = blob.drivers.filter((d) => blob.gaps[d.num]);
     if (withGaps.length === 0) return;
 
@@ -52,7 +53,7 @@ export function GapChart({
           const cx = u.valToPos(player.t, "x", true);
           const ctx = u.ctx;
           ctx.save();
-          ctx.strokeStyle = "#eceaf6";
+          ctx.strokeStyle = pal.ink;
           ctx.globalAlpha = 0.45;
           ctx.lineWidth = 1;
           ctx.beginPath();
@@ -71,7 +72,7 @@ export function GapChart({
             const x = u.valToPos(ts[li], "x", true) + 6;
             const y = u.valToPos(series[li]!, "y", true) + 3;
             ctx.globalAlpha = hl.size > 0 && !hl.has(d.num) ? 0.3 : 1;
-            ctx.fillStyle = colors.get(d.num) ?? AXIS;
+            ctx.fillStyle = colors.get(d.num) ?? pal.axis;
             ctx.fillText(d.acronym, x, y);
           });
           ctx.restore();
@@ -91,7 +92,7 @@ export function GapChart({
           {},
           ...withGaps.map((d) => ({
             label: d.acronym,
-            stroke: colors.get(d.num) ?? AXIS,
+            stroke: colors.get(d.num) ?? pal.axis,
             width: 1.5,
             dash: dashed.has(d.num) ? [5, 4] : undefined,
             points: { show: false },
@@ -99,8 +100,8 @@ export function GapChart({
           })),
         ],
         axes: [
-          { stroke: AXIS, font: FONT, grid: { stroke: GRID, width: 1 }, ticks: { stroke: GRID, width: 1 }, values: (_u, vals) => vals.map(fmtClock) },
-          { stroke: AXIS, font: FONT, size: 48, grid: { stroke: GRID, width: 1 }, ticks: { stroke: GRID, width: 1 }, values: (_u, vals) => vals.map((v) => `+${v}s`) },
+          { stroke: pal.axis, font: FONT, grid: { stroke: pal.grid, width: 1 }, ticks: { stroke: pal.grid, width: 1 }, values: (_u, vals) => vals.map(fmtClock) },
+          { stroke: pal.axis, font: FONT, size: 48, grid: { stroke: pal.grid, width: 1 }, ticks: { stroke: pal.grid, width: 1 }, values: (_u, vals) => vals.map((v) => `+${v}s`) },
         ],
         plugins: [playhead],
       },
@@ -140,7 +141,7 @@ export function GapChart({
       ro.disconnect();
       u.destroy();
     };
-  }, [blob, colors, dashed, player]);
+  }, [blob, colors, dashed, player, theme]);
 
   useEffect(() => {
     hlRef.current = highlight;

@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
 @font-face {
+  font-family: "Fraunces";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/fraunces.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fraunces";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/fraunces-italic.woff2") format("woff2");
+}
+
+@font-face {
   font-family: "Space Grotesk";
   font-style: normal;
   font-weight: 300 700;
@@ -17,69 +33,117 @@
 }
 
 @theme {
-  /* charcoal scale, cool-tinted */
-  --color-ink-950: #08080d;
-  --color-ink-900: #0b0b12;
-  --color-ink-850: #0e0e16;
-  --color-ink-800: #12121c;
-  --color-ink-700: #1a1a26;
-  --color-ink-600: #23232f;
+  /* paper — warm, print-like ground */
+  --color-paper: #f6f1e5;
+  --color-paper-2: #efe8d6;
+  --color-paper-3: #e5dcc4;
 
-  --color-fog-100: #eceaf6;
-  --color-fog-300: #b9b7c9;
-  --color-fog-500: #7e7c92;
+  /* warm ink scale */
+  --color-ink: #1c1710;
+  --color-ink-2: #5b5442;
+  --color-ink-3: #8d8470;
 
-  /* neon accents */
-  --color-neon-cyan: #2de2e6;
-  --color-neon-magenta: #ff2d78;
-  --color-neon-violet: #a06cff;
-  --color-neon-amber: #ffb02e;
-  --color-neon-green: #3ff5a0;
+  /* the one accent */
+  --color-red: #c8102e;
+  --color-red-deep: #9d0a24;
 
-  /* timing-screen conventions */
-  --color-sector-best: #b26cff; /* overall best — F1 "purple" */
-  --color-sector-pb: #3ff5a0; /* personal best — green */
-  --color-sector-set: #ffd60a; /* completed, no improvement — yellow */
-  --color-tyre-soft: #ff4d4d;
-  --color-tyre-medium: #ffd60a;
-  --color-tyre-hard: #e8e8f0;
-  --color-tyre-inter: #43d15f;
-  --color-tyre-wet: #3f9bff;
+  /* supporting editorial hues (used sparingly: status, charts) */
+  --color-green: #1a7f4e;
+  --color-ochre: #a07d00;
+  --color-blue: #1e5aa8;
 
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  /* timing-screen conventions, remapped for paper */
+  --color-sector-best: #6d28d9; /* overall best — F1 "purple" */
+  --color-sector-pb: #1a7f4e; /* personal best — green */
+  --color-sector-set: #a07d00; /* completed, no improvement — yellow */
+  --color-tyre-soft: #c8102e;
+  --color-tyre-medium: #a07d00;
+  --color-tyre-hard: #5b5442;
+  --color-tyre-inter: #1a7f4e;
+  --color-tyre-wet: #1e5aa8;
+
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* chart + canvas chrome (not Tailwind tokens — read via chartPalette()) */
+:root {
+  --chart-grid: #e2dac2;
+  --chart-axis: #8d8470;
+  --track-bed: #e6dfca;
+  color-scheme: light;
+}
+
+/* night — the same editorial system on a warm dark ground */
+:root[data-theme="dark"] {
+  --color-paper: #171310;
+  --color-paper-2: #201a13;
+  --color-paper-3: #2c2418;
+
+  --color-ink: #ece4d2;
+  --color-ink-2: #a99f89;
+  --color-ink-3: #7a715e;
+
+  --color-red: #e63b52;
+  --color-red-deep: #c8102e;
+
+  --color-green: #3fae74;
+  --color-ochre: #cfa42a;
+  --color-blue: #6b9bd8;
+
+  --color-sector-best: #a78bfa;
+  --color-sector-pb: #3fae74;
+  --color-sector-set: #cfa42a;
+  --color-tyre-soft: #e63b52;
+  --color-tyre-medium: #cfa42a;
+  --color-tyre-hard: #b0a68f;
+  --color-tyre-inter: #3fae74;
+  --color-tyre-wet: #6b9bd8;
+
+  --chart-grid: #2c2418;
+  --chart-axis: #7a715e;
+  --track-bed: #241e15;
+  color-scheme: dark;
+}
+
 html {
-  background: var(--color-ink-950);
-  color: var(--color-fog-100);
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
 body {
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-  background: var(--color-neon-cyan);
-  color: var(--color-ink-950);
+  background: var(--color-red);
+  color: var(--color-paper);
 }
 
-/* kerb stripe — the BoxBox brand motif (apron kerbs, tilted 45°) */
-.kerb {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--kerb-color, var(--color-neon-cyan)) 0 5px,
-    transparent 5px 10px
-  );
+/* the BoxBox display voice: Fraunces at full optical size, tight */
+.display {
+  font-family: var(--font-serif);
+  font-variation-settings: "opsz" 144;
+  letter-spacing: -0.015em;
 }
 
-/* chamfered corner for primary actions — one cut, bottom-right */
-.chamfer {
-  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%);
+/* newspaper double rule — thick over thin */
+.rule-double {
+  border-top: 3px solid var(--color-ink);
+  position: relative;
+}
+.rule-double::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--color-ink);
 }
 
-/* custom range slider — hairline track, square neon thumb */
+/* custom range slider — hairline track, square ink thumb */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -89,7 +153,7 @@ input[type="range"] {
 }
 input[type="range"]::-webkit-slider-runnable-track {
   height: 2px;
-  background: var(--color-ink-600);
+  background: color-mix(in srgb, var(--color-ink) 25%, transparent);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -97,45 +161,46 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: -6px;
   height: 14px;
   width: 14px;
-  background: var(--color-neon-cyan);
+  background: var(--color-ink);
   border: none;
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, background-color 0.12s ease;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.2);
+  background: var(--color-red);
 }
 input[type="range"]::-moz-range-track {
   height: 2px;
-  background: var(--color-ink-600);
+  background: color-mix(in srgb, var(--color-ink) 25%, transparent);
 }
 input[type="range"]::-moz-range-thumb {
   height: 14px;
   width: 14px;
   border: none;
   border-radius: 0;
-  background: var(--color-neon-cyan);
+  background: var(--color-ink);
 }
 
-/* custom checkbox — square, neon tick */
+/* custom checkbox — square, red tick */
 input[type="checkbox"].box {
   appearance: none;
   height: 16px;
   width: 16px;
-  border: 1px solid var(--color-ink-600);
-  background: var(--color-ink-800);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 40%, transparent);
+  background: transparent;
   cursor: pointer;
   display: inline-grid;
   place-content: center;
   transition: border-color 0.15s ease;
 }
 input[type="checkbox"].box:hover {
-  border-color: var(--color-fog-500);
+  border-color: var(--color-ink);
 }
 input[type="checkbox"].box::before {
   content: "";
   height: 8px;
   width: 8px;
-  background: var(--color-neon-cyan);
+  background: var(--color-red);
   transform: scale(0);
   transition: transform 0.12s ease;
 }
@@ -147,13 +212,18 @@ input[type="checkbox"].box:checked::before {
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: var(--color-ink-800);
+  background: var(--color-paper-2);
 }
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgba(236, 234, 246, 0.045) 50%, transparent 70%);
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--color-ink) 5%, transparent) 50%,
+    transparent 70%
+  );
   animation: skeleton-sweep 1.6s ease-in-out infinite;
 }
 @keyframes skeleton-sweep {
@@ -170,17 +240,17 @@ input[type="checkbox"].box:checked::before {
   }
 }
 
-/* thin dark scrollbars for panels */
+/* thin scrollbars for panels */
 .panel-scroll {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-ink-600) transparent;
+  scrollbar-color: var(--color-paper-3) transparent;
 }
 .panel-scroll::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 .panel-scroll::-webkit-scrollbar-thumb {
-  background: var(--color-ink-600);
+  background: var(--color-paper-3);
   border-radius: 3px;
 }
 

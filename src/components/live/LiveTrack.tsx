@@ -5,6 +5,7 @@ import { drawCar, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit } from "@/lib/track/geometry";
 import type { LivePlayback } from "@/lib/live/playback";
 import type { LiveMeta } from "@/lib/live/types";
+import { chartPalette } from "@/lib/theme";
 
 /**
  * Live all-cars canvas. The playback buffer replays polled frames on a
@@ -53,13 +54,14 @@ export function LiveTrack({
       raf = requestAnimationFrame(draw);
       if (!projector || !trackPath) return;
       const proj = projector;
+      const pal = chartPalette();
       ctx.clearRect(0, 0, w, h);
       ctx.lineJoin = "round";
-      ctx.strokeStyle = "#23232f";
+      ctx.strokeStyle = pal.trackBed;
       ctx.lineWidth = 10;
       ctx.stroke(trackPath);
-      ctx.strokeStyle = "#3a3a4a";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = pal.inkFaint;
+      ctx.lineWidth = 1.25;
       ctx.stroke(trackPath);
 
       const pb = playback.current;
@@ -69,7 +71,7 @@ export function LiveTrack({
         const pos = pb.posAt(d.num, t);
         if (!pos) continue;
         const [px, py] = proj.project([pos.x, pos.y]);
-        const color = colors.get(d.num) ?? "#7e7c92";
+        const color = colors.get(d.num) ?? pal.axis;
         // heading from a short look-back along the buffered path
         const prev = pb.posAt(d.num, t - 0.4) ?? pos;
         const [qx, qy] = proj.project([prev.x, prev.y]);

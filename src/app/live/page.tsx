@@ -7,6 +7,7 @@ import { StageSkeleton } from "@/components/ui/Loading";
 import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
 import { Select } from "@/components/ui/Select";
 import { teamColor } from "@/lib/color";
+import { useTheme } from "@/lib/theme";
 import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
 import type { BakedCircuit } from "@/lib/track/geometry";
 import type { LiveFrame, LiveMeta } from "@/lib/live/types";
@@ -39,6 +40,9 @@ export default function LivePage() {
   const [order, setOrder] = useState<{ num: number; pos: number; gap: number | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const clockRef = useRef<HTMLSpanElement>(null);
+  const bufRef = useRef<HTMLSpanElement>(null);
+  /** session-seconds one poll covers — the buffer readout goes red below this */
+  const pollSRef = useRef(4);
   const playback = useRef<LivePlayback | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
@@ -68,10 +72,12 @@ export default function LivePage() {
     setError(null);
     setStatus("connecting");
 
-    // clock trails the newest data by ~1.5 poll windows of session time,
-    // so there is always buffered path to glide through
+    // clock trails the newest data by ~2.75 poll windows of session time —
+    // deep enough that one slow uncached poll doesn't drain the buffer and
+    // freeze the field
     const pollMs = simulate ? Math.max(1000, 4000 / speed) : 4000;
-    const lagS = 1.5 * (pollMs / 1000) * (simulate ? speed : 1);
+    const lagS = 2.75 * (pollMs / 1000) * (simulate ? speed : 1);
+    pollSRef.current = (pollMs / 1000) * (simulate ? speed : 1);
     playback.current = new LivePlayback(simulate ? speed : 1, lagS);
     const url = `/api/live/${sessionKey}${simulate ? `?simulate=1&speed=${speed}` : ""}`;
     const es = new EventSource(url);
@@ -118,6 +124,11 @@ export default function LivePage() {
       if (!pb || !pb.hasData) return;
       const t = pb.now();
       if (clockRef.current) clockRef.current.textContent = fmtClock(t);
+      if (bufRef.current) {
+        const buf = pb.bufferS;
+        bufRef.current.textContent = `BUF ${buf.toFixed(1)}S`;
+        bufRef.current.style.color = buf < pollSRef.current ? "var(--color-red)" : "";
+      }
       const events = pb.drainEvents(t);
       if (events.length === 0) return;
       for (const e of events) {
@@ -134,11 +145,12 @@ export default function LivePage() {
     return () => clearInterval(id);
   }, [status]);
 
+  const theme = useTheme();
   const colors = useMemo(() => {
     const m = new Map<number, string>();
-    for (const d of meta?.drivers ?? []) m.set(d.num, teamColor(d.colour));
+    for (const d of meta?.drivers ?? []) m.set(d.num, teamColor(d.colour, theme));
     return m;
-  }, [meta]);
+  }, [meta, theme]);
 
   const byNum = useMemo(() => new Map((meta?.drivers ?? []).map((d) => [d.num, d])), [meta]);
 
@@ -158,7 +170,7 @@ export default function LivePage() {
             hint: s.date_start.slice(0, 10),
           }))}
         />
-        <label className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-fog-300">
+        <label className="flex h-10 cursor-pointer items-center gap-2 text-[13px] text-ink-2">
           <input type="checkbox" checked={simulate} onChange={(e) => setSimulate(e.target.checked)} className="box" />
           Simulate
         </label>
@@ -174,20 +186,21 @@ export default function LivePage() {
         <button
           onClick={connect}
           disabled={!sessionKey || status === "connecting"}
-          className="chamfer h-10 bg-neon-cyan px-5 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+          className="h-10 bg-ink px-5 text-[13px] font-semibold text-paper transition-colors hover:bg-red disabled:opacity-40"
         >
           {status === "connecting" ? "Connecting…" : status === "live" ? "Reconnect" : "Connect"}
         </button>
-        <span className="flex h-10 items-center gap-2 text-[13px] text-fog-500 md:ml-auto">
-          {status === "live" && <span className="h-2 w-2 animate-pulse rounded-full bg-neon-green" />}
-          {status === "ended" && <span className="h-2 w-2 rounded-full bg-fog-500" />}
+        <span className="flex h-10 items-center gap-2 text-[13px] text-ink-3 md:ml-auto">
+          {status === "live" && <span className="h-2 w-2 animate-pulse rounded-full bg-red" />}
+          {status === "ended" && <span className="h-2 w-2 rounded-full bg-ink-3" />}
           {status === "live" ? "LIVE" : status === "ended" ? "SESSION ENDED" : status.toUpperCase()}
-          <span ref={clockRef} className="font-mono text-fog-100">—</span>
+          <span ref={clockRef} className="font-mono text-ink">—</span>
+          {status === "live" && <span ref={bufRef} className="font-mono text-[11px] text-ink-3" />}
         </span>
       </div>
 
       {error && (
-        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
 
       {status === "connecting" && <StageSkeleton label="CONNECTING FEED" note="SSE" sidebarRows={10} />}
@@ -203,31 +216,31 @@ export default function LivePage() {
         <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
           <Panel className="min-w-0 overflow-hidden">
             <div className="px-4 pt-4">
-              <SectionLabel accent="#3ff5a0">{meta.sessionName.toUpperCase()} — DELAYED REST FEED</SectionLabel>
+              <SectionLabel accent="var(--color-green)">{meta.sessionName.toUpperCase()} — DELAYED REST FEED</SectionLabel>
             </div>
             <div className="aspect-[4/3]">
               <LiveTrack circuit={circuit} meta={meta} colors={colors} playback={playback} />
             </div>
           </Panel>
           <Panel className="panel-scroll max-h-[640px] overflow-y-auto">
-            <div className="sticky top-0 z-10 border-b border-ink-700/70 bg-ink-900 px-4 py-3">
-              <SectionLabel accent="#3ff5a0">RUNNING ORDER</SectionLabel>
+            <div className="sticky top-0 z-10 border-b border-ink/15 bg-paper px-4 py-3">
+              <SectionLabel accent="var(--color-green)">RUNNING ORDER</SectionLabel>
             </div>
             {order.map((r) => {
               const d = byNum.get(r.num);
               if (!d) return null;
               return (
-                <div key={r.num} className="flex items-center gap-2.5 border-b border-ink-700/40 px-4 py-[7px] text-[13px] last:border-b-0">
-                  <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-fog-500">{r.pos}</span>
+                <div key={r.num} className="flex items-center gap-2.5 border-b border-ink/10 px-4 py-[7px] text-[13px] last:border-b-0">
+                  <span className="w-5 shrink-0 font-mono text-[11px] tabular-nums text-ink-3">{r.pos}</span>
                   <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: colors.get(r.num) }} />
                   <span className="font-semibold">{d.acronym}</span>
-                  <span className="ml-auto font-mono text-[12px] text-fog-300">
+                  <span className="ml-auto font-mono text-[12px] text-ink-2">
                     {r.pos === 1 ? "LEADER" : r.gap != null ? `+${r.gap.toFixed(1)}` : "—"}
                   </span>
                 </div>
               );
             })}
-            {order.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-fog-500">Waiting for timing data…</div>}
+            {order.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-ink-3">Waiting for timing data…</div>}
           </Panel>
         </div>
       )}

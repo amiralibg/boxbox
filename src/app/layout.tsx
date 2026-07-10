@@ -15,17 +15,25 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-ink-950 text-fog-100">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.dataset.theme=localStorage.getItem("boxbox-theme")||"dark"}catch(e){document.documentElement.dataset.theme="dark"}`,
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-paper text-ink">
         <SiteNav />
         {children}
-        <footer className="mt-16 border-t border-ink-700/70">
-          <div className="mx-auto max-w-7xl px-5 md:px-6">
-            <div className="kerb h-[5px] w-24 opacity-60" />
-            <div className="flex items-center justify-between py-6">
-              <span className="font-mono text-[10px] tracking-[0.25em] text-fog-500">BOXBOX</span>
-              <span className="font-mono text-[10px] tracking-wide text-fog-500">DATA · OPENF1 + F1DB + MULTIVIEWER</span>
-            </div>
+        <footer className="mt-20 border-t border-ink/20">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-baseline justify-between gap-x-8 gap-y-2 px-5 py-6 md:px-8">
+            <span className="display text-[15px] font-black">
+              BoxBox<span className="text-red">.</span>
+            </span>
+            <span className="font-mono text-[10px] tracking-[0.2em] text-ink-3">
+              DATA — OPENF1 · F1DB · MULTIVIEWER
+            </span>
           </div>
         </footer>
       </body>

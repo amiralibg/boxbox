@@ -26,11 +26,11 @@ export interface TimingRow {
 }
 
 const toneClass: Record<CellTone, string> = {
-  default: "text-fog-100",
-  muted: "text-fog-500",
+  default: "text-ink",
+  muted: "text-ink-3",
   best: "text-[--color-sector-best] font-semibold",
   pb: "text-[--color-sector-pb] font-semibold",
-  accent: "text-neon-cyan font-semibold",
+  accent: "text-red font-semibold",
 };
 
 export function TimingTable({ columns, rows, dense = false }: { columns: TimingColumn[]; rows: TimingRow[]; dense?: boolean }) {
@@ -38,12 +38,12 @@ export function TimingTable({ columns, rows, dense = false }: { columns: TimingC
     <div className="panel-scroll w-full overflow-x-auto">
       <table className="w-full border-collapse whitespace-nowrap">
         <thead>
-          <tr className="border-b border-ink-600">
+          <tr className="border-b border-ink/30">
             {columns.map((c) => (
               <th
                 key={c.key}
                 style={{ minWidth: c.minWidth }}
-                className={`px-2 py-2.5 text-[10px] first:pl-3 last:pr-3 font-medium tracking-[0.2em] text-fog-500 ${
+                className={`px-2 py-2.5 text-[10px] first:pl-3 last:pr-3 font-medium tracking-[0.2em] text-ink-3 ${
                   c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left"
                 }`}
               >
@@ -54,7 +54,7 @@ export function TimingTable({ columns, rows, dense = false }: { columns: TimingC
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.key} className="border-b border-ink-700/50 last:border-b-0 hover:bg-ink-800/60">
+            <tr key={r.key} className="border-b border-ink/10 last:border-b-0 hover:bg-paper-2/70">
               {columns.map((c) => {
                 const raw = r.cells[c.key];
                 const cell: TimingCell = typeof raw === "object" && raw !== null && "text" in raw ? raw : { text: raw as React.ReactNode };
@@ -85,12 +85,12 @@ const SEGMENT_COLOR: Record<number, string> = {
   2048: "var(--color-sector-set)", // completed, no improvement
   2049: "var(--color-sector-pb)", // personal best
   2051: "var(--color-sector-best)", // overall best
-  2052: "var(--color-fog-500)", // unknown
+  2052: "var(--color-ink-3)", // unknown
   2064: "var(--color-tyre-wet)", // pit lane
 };
 
 export function segmentColor(code: number): string {
-  return SEGMENT_COLOR[code] ?? "var(--color-ink-600)";
+  return SEGMENT_COLOR[code] ?? "var(--color-paper-3)";
 }
 
 /**
@@ -123,7 +123,7 @@ const COMPOUND_STYLE: Record<string, { color: string; letter: string }> = {
 };
 
 export function compoundStyle(compound: string | null | undefined) {
-  return COMPOUND_STYLE[(compound ?? "").toUpperCase()] ?? { color: "var(--color-fog-500)", letter: "?" };
+  return COMPOUND_STYLE[(compound ?? "").toUpperCase()] ?? { color: "var(--color-ink-3)", letter: "?" };
 }
 
 /** Pirelli-style compound ring. */

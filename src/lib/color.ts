@@ -1,4 +1,6 @@
-/** Team-colour handling: normalize OpenF1 hex, keep it legible on charcoal. */
+/** Team-colour handling: normalize OpenF1 hex, keep it legible on either ground. */
+
+import type { Theme } from "@/lib/theme";
 
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
@@ -22,19 +24,31 @@ export function lighten(hex: string, amount: number): string {
   return rgbToHex([r + (255 - r) * amount, g + (255 - g) * amount, b + (255 - b) * amount]);
 }
 
+export function darken(hex: string, amount: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  return rgbToHex([r * (1 - amount), g * (1 - amount), b * (1 - amount)]);
+}
+
 /**
  * OpenF1 team_colour is a bare hex like "3671C6" (sometimes null). Normalize
- * and lift anything too dark to read against the ink background.
+ * and clamp for the active ground: on paper, pull anything too bright down
+ * (Haas white, Williams pale blue…); on dark, lift anything too dark up
+ * (Red Bull navy, Alpine…).
  */
-export function teamColor(raw: string | null, fallback = "#2de2e6"): string {
-  if (!raw || !/^[0-9a-fA-F]{6}$/.test(raw)) return fallback;
+export function teamColor(raw: string | null, theme: Theme = "paper", fallback?: string): string {
+  const fb = fallback ?? (theme === "dark" ? "#ece4d2" : "#1c1710");
+  if (!raw || !/^[0-9a-fA-F]{6}$/.test(raw)) return fb;
   let hex = `#${raw.toLowerCase()}`;
-  while (luminance(hexToRgb(hex)) < 0.18) hex = lighten(hex, 0.15);
+  if (theme === "dark") {
+    while (luminance(hexToRgb(hex)) < 0.18) hex = lighten(hex, 0.15);
+  } else {
+    while (luminance(hexToRgb(hex)) > 0.38) hex = darken(hex, 0.15);
+  }
   return hex;
 }
 
 /** Two drivers of one team arrive with identical colours — split them apart. */
 export function distinctPair(a: string, b: string): [string, string] {
   if (a.toLowerCase() !== b.toLowerCase()) return [a, b];
-  return [a, lighten(b, 0.55)];
+  return [a, lighten(b, 0.35)];
 }

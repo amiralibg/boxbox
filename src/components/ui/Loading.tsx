@@ -8,8 +8,8 @@ export function Skeleton({ className = "" }: { className?: string }) {
 /** Pulsing status line for long jobs — always paired with words, never bare. */
 export function LoadingLine({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2.5 text-[12px] text-fog-500">
-      <span className="h-1.5 w-1.5 animate-pulse bg-neon-cyan" />
+    <div className="flex items-center gap-2.5 text-[12px] text-ink-2">
+      <span className="h-1.5 w-1.5 animate-pulse bg-red" />
       {children}
     </div>
   );
@@ -26,7 +26,7 @@ export function StageSkeleton({ label, note, sidebarRows = 8 }: { label: string;
       <Panel className="min-w-0 overflow-hidden">
         <div className="flex items-center justify-between px-4 pt-4">
           <SectionLabel>{label}</SectionLabel>
-          {note && <span className="hidden font-mono text-[10px] text-fog-500 sm:block">{note}</span>}
+          {note && <span className="hidden font-mono text-[10px] text-ink-3 sm:block">{note}</span>}
         </div>
         <div className="p-4">
           <Skeleton className="aspect-[4/3] w-full" />

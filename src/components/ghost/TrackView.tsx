@@ -6,6 +6,7 @@ import { makeProjector, type BakedCircuit, type Pt } from "@/lib/track/geometry"
 import { sampleLap } from "@/lib/telemetry/sample";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
 import type { BakedLap } from "@/lib/telemetry/types";
+import { chartPalette } from "@/lib/theme";
 
 const TRAIL_S = 1.6; // seconds of trail behind each car
 
@@ -52,17 +53,18 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
       ctx.clearRect(0, 0, w, h);
 
       // track bed
+      const pal = chartPalette();
       ctx.lineJoin = "round";
-      ctx.strokeStyle = "#23232f";
+      ctx.strokeStyle = pal.trackBed;
       ctx.lineWidth = 11;
       ctx.stroke(trackPath);
-      ctx.strokeStyle = "#3a3a4a";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = pal.inkFaint;
+      ctx.lineWidth = 1.25;
       ctx.stroke(trackPath);
 
       // start / finish
       const [sx, sy] = proj.trackScreen[0];
-      ctx.fillStyle = "#eceaf6";
+      ctx.fillStyle = pal.ink;
       ctx.beginPath();
       ctx.arc(sx, sy, 3, 0, Math.PI * 2);
       ctx.fill();

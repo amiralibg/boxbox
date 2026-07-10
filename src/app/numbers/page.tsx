@@ -7,8 +7,8 @@ import { Select } from "@/components/ui/Select";
 import { getDb } from "@/lib/db/duckdb";
 import { seasonMatrix, teammateH2H, type H2HPair, type SeasonMatrix } from "@/lib/db/queries";
 
-const A = "#2de2e6";
-const B = "#ff2d78";
+const A = "var(--color-red)";
+const B = "var(--color-blue)";
 const YEARS = Array.from({ length: 2026 - 1950 + 1 }, (_, i) => 2026 - i);
 const YEAR_OPTIONS = YEARS.map((y) => ({ value: String(y), label: String(y) }));
 
@@ -30,7 +30,7 @@ export default function NumbersPage() {
     <main className="mx-auto max-w-6xl px-5 py-8 md:px-6 md:py-10">
       <PageTitle index="04" title="The Numbers" sub="Every season since 1950, queried in your browser. No server involved." />
 
-      <div className="mt-6 flex gap-0 border-b border-ink-700/70">
+      <div className="mt-6 flex gap-0 border-b border-ink/20">
         {(
           [
             ["h2h", "Teammate H2H"],
@@ -41,17 +41,17 @@ export default function NumbersPage() {
             key={id}
             onClick={() => setTab(id)}
             className={`relative px-4 py-3 text-[13px] tracking-wide transition-colors ${
-              tab === id ? "text-fog-100" : "text-fog-500 hover:text-fog-300"
+              tab === id ? "text-ink" : "text-ink-3 hover:text-ink"
             }`}
           >
             {label}
-            {tab === id && <span className="absolute inset-x-4 -bottom-px h-[2px] bg-neon-cyan" />}
+            {tab === id && <span className="absolute inset-x-4 -bottom-px h-[2px] bg-red" />}
           </button>
         ))}
       </div>
 
       {error && (
-        <div className="mt-4 border border-neon-magenta/40 bg-neon-magenta/10 px-4 py-3 text-[13px] text-neon-magenta">{error}</div>
+        <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
       {!ready && !error && (
         <div className="mt-8">
@@ -72,7 +72,7 @@ function SplitBar({ a, b }: { a: number; b: number }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-12 text-right font-mono text-[13px] tabular-nums" style={{ color: A }}>{a}</span>
-      <div className="flex h-[6px] flex-1 gap-[2px] bg-ink-700">
+      <div className="flex h-[6px] flex-1 gap-[2px] bg-paper-3">
         <div style={{ width: `${(a / total) * 100}%`, backgroundColor: A }} />
         <div style={{ width: `${(b / total) * 100}%`, backgroundColor: B }} />
       </div>
@@ -94,7 +94,7 @@ function H2HTab() {
   return (
     <div className="mt-6">
       <Select label="SEASON" className="w-36" value={String(year)} onValueChange={(v) => setYear(Number(v))} options={YEAR_OPTIONS} />
-      {error && <div className="mt-4 text-[13px] text-neon-magenta">{error}</div>}
+      {error && <div className="mt-4 text-[13px] text-red-deep">{error}</div>}
       {!pairs && !error && <CardsSkeleton count={6} className="mt-5" />}
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -102,11 +102,11 @@ function H2HTab() {
           <Panel key={`${p.constructorId}-${p.driverA}-${p.driverB}`} className="p-5">
             <div className="flex items-baseline justify-between gap-3">
               <SectionLabel>{p.constructorName.toUpperCase()}</SectionLabel>
-              <span className="shrink-0 font-mono text-[10px] text-fog-500">{p.rounds} ROUNDS</span>
+              <span className="shrink-0 font-mono text-[10px] text-ink-3">{p.rounds} ROUNDS</span>
             </div>
             <div className="mt-3 flex items-baseline justify-between gap-3">
               <span className="truncate text-[15px] font-semibold" style={{ color: A }}>{p.nameA}</span>
-              <span className="shrink-0 text-[11px] text-fog-500">vs</span>
+              <span className="shrink-0 text-[11px] italic text-ink-3">vs</span>
               <span className="truncate text-right text-[15px] font-semibold" style={{ color: B }}>{p.nameB}</span>
             </div>
             <div className="mt-4 space-y-3">
@@ -118,7 +118,7 @@ function H2HTab() {
                 ] as const
               ).map(([label, a, b]) => (
                 <div key={label}>
-                  <div className="mb-1 text-[10px] tracking-[0.18em] text-fog-500">{label}</div>
+                  <div className="mb-1 text-[10px] tracking-[0.18em] text-ink-3">{label}</div>
                   <SplitBar a={a} b={b} />
                 </div>
               ))}
@@ -211,7 +211,7 @@ function WhatIfTab() {
                 setDnfDriver("");
                 setDnfRound(0);
               }}
-              className="chamfer h-10 bg-neon-cyan px-4 text-[13px] font-bold text-ink-950 transition-opacity hover:opacity-85 disabled:opacity-40"
+              className="h-10 bg-ink px-4 text-[13px] font-semibold text-paper transition-colors hover:bg-red disabled:opacity-40"
             >
               Add DNF
             </button>
@@ -221,7 +221,7 @@ function WhatIfTab() {
                   setExcluded(new Set());
                   setDnfs([]);
                 }}
-                className="h-10 border border-ink-600 px-4 text-[13px] text-fog-300 transition-colors hover:text-fog-100"
+                className="h-10 border border-ink/25 px-4 text-[13px] text-ink-2 transition-colors hover:border-ink/60 hover:text-ink"
               >
                 Reset
               </button>
@@ -230,7 +230,7 @@ function WhatIfTab() {
         )}
       </div>
 
-      {error && <div className="mt-4 text-[13px] text-neon-magenta">{error}</div>}
+      {error && <div className="mt-4 text-[13px] text-red-deep">{error}</div>}
       {!matrix && !error && <CardsSkeleton count={2} className="mt-6" />}
 
       {matrix && (
@@ -247,11 +247,11 @@ function WhatIfTab() {
                     title={pretty(r.name)}
                     className={`border px-2.5 py-1.5 text-[12px] transition-colors ${
                       off
-                        ? "border-neon-magenta/50 bg-neon-magenta/10 text-neon-magenta line-through"
-                        : "border-ink-600 bg-ink-800 text-fog-300 hover:text-fog-100"
+                        ? "border-red/40 bg-red/5 text-red-deep line-through"
+                        : "border-ink/20 text-ink-2 hover:border-ink/50 hover:text-ink"
                     }`}
                   >
-                    <span className="mr-1.5 font-mono text-[10px] text-fog-500">R{r.round}</span>
+                    <span className="mr-1.5 font-mono text-[10px] text-ink-3">R{r.round}</span>
                     {pretty(r.name)}
                   </button>
                 );
@@ -260,13 +260,13 @@ function WhatIfTab() {
 
             {dnfs.length > 0 && (
               <div className="mt-6">
-                <SectionLabel accent="#ffb02e">INJECTED DNFS</SectionLabel>
+                <SectionLabel accent="var(--color-ochre)">INJECTED DNFS</SectionLabel>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {dnfs.map((d, i) => (
                     <button
                       key={i}
                       onClick={() => setDnfs((prev) => prev.filter((_, j) => j !== i))}
-                      className="border border-neon-amber/50 bg-neon-amber/10 px-2.5 py-1.5 text-[12px] text-neon-amber"
+                      className="border border-ochre/40 bg-ochre/10 px-2.5 py-1.5 text-[12px] text-ochre"
                     >
                       {matrix.drivers.find((x) => x.id === d.driverId)?.name} — R{d.round} ✕
                     </button>
@@ -277,33 +277,33 @@ function WhatIfTab() {
           </div>
 
           <Panel>
-            <div className="flex items-baseline justify-between border-b border-ink-700/70 px-4 py-3">
-              <SectionLabel accent={modified ? "#ffb02e" : "#2de2e6"}>
+            <div className="flex items-baseline justify-between border-b border-ink/15 px-4 py-3">
+              <SectionLabel accent={modified ? "var(--color-ochre)" : undefined}>
                 {modified ? "WHAT-IF STANDINGS" : "FINAL STANDINGS"}
               </SectionLabel>
-              {modified && <span className="font-mono text-[10px] text-neon-amber">MODIFIED</span>}
+              {modified && <span className="font-mono text-[10px] text-ochre">MODIFIED</span>}
             </div>
             {standings.slice(0, 12).map((s) => (
               <div
                 key={s.id}
-                className={`flex items-center gap-3 border-b border-ink-700/40 px-4 py-2 text-[13px] last:border-b-0 ${
-                  s.pos === 1 ? "bg-ink-800/70" : ""
+                className={`flex items-center gap-3 border-b border-ink/10 px-4 py-2 text-[13px] last:border-b-0 ${
+                  s.pos === 1 ? "bg-paper-2" : ""
                 }`}
               >
-                <span className="w-5 font-mono text-[11px] tabular-nums text-fog-500">{s.pos}</span>
+                <span className="w-5 font-mono text-[11px] tabular-nums text-ink-3">{s.pos}</span>
                 <span className={`truncate ${s.pos === 1 ? "font-bold" : ""}`}>{s.name}</span>
-                {s.pos === 1 && <span className="shrink-0 text-[9px] tracking-[0.2em] text-neon-amber">CHAMPION</span>}
+                {s.pos === 1 && <span className="shrink-0 text-[9px] tracking-[0.2em] text-red">CHAMPION</span>}
                 <span className="ml-auto font-mono tabular-nums">{s.pts}</span>
                 <span
                   className={`w-8 text-right font-mono text-[11px] tabular-nums ${
-                    s.delta > 0 ? "text-neon-green" : s.delta < 0 ? "text-neon-magenta" : "text-fog-500"
+                    s.delta > 0 ? "text-green" : s.delta < 0 ? "text-red" : "text-ink-3"
                   }`}
                 >
                   {s.delta > 0 ? `▲${s.delta}` : s.delta < 0 ? `▼${-s.delta}` : "·"}
                 </span>
               </div>
             ))}
-            <div className="px-4 py-3 text-[11px] leading-relaxed text-fog-500">
+            <div className="px-4 py-3 text-[11px] leading-relaxed text-ink-3">
               Points only — championship countback (win counts) not modelled; ties keep original standings order.
             </div>
           </Panel>
