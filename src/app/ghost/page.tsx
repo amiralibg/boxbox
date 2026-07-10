@@ -47,16 +47,40 @@ export default function GhostPage() {
   const [geometryNote, setGeometryNote] = useState<string | null>(null);
 
   useEffect(() => {
+    const requestedYear = Number(new URLSearchParams(window.location.search).get("year"));
+    if (YEARS.includes(requestedYear)) setYear(requestedYear);
+  }, []);
+
+  useEffect(() => {
+    let stale = false;
     setSessions([]);
     setMeetingKey(null);
     setSessionKey(null);
-    getJson<SessionInfo[]>(`/api/sessions?year=${year}`).then(setSessions).catch((e) => setError(String(e)));
+    getJson<SessionInfo[]>(`/api/sessions?year=${year}`)
+      .then((next) => {
+        if (!stale) setSessions(next);
+      })
+      .catch((e) => {
+        if (!stale) setError(String(e));
+      });
+    return () => {
+      stale = true;
+    };
   }, [year]);
 
   const meetings = useMemo(() => {
     const seen = new Map<number, SessionInfo>();
     for (const s of sessions) if (!seen.has(s.meeting_key)) seen.set(s.meeting_key, s);
     return [...seen.values()];
+  }, [sessions]);
+
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    const requestedSession = Number(new URLSearchParams(window.location.search).get("session"));
+    const selected = sessions.find((session) => session.session_key === requestedSession);
+    if (!selected) return;
+    setMeetingKey(selected.meeting_key);
+    setSessionKey(selected.session_key);
   }, [sessions]);
 
   const meetingSessions = useMemo(
@@ -72,6 +96,15 @@ export default function GhostPage() {
     if (!sessionKey) return;
     getJson<DriverInfo[]>(`/api/drivers?session_key=${sessionKey}`).then(setDrivers).catch((e) => setError(String(e)));
   }, [sessionKey]);
+
+  useEffect(() => {
+    if (drivers.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedA = Number(params.get("a"));
+    const requestedB = Number(params.get("b"));
+    if (drivers.some((driver) => driver.driver_number === requestedA)) setNumA(requestedA);
+    if (drivers.some((driver) => driver.driver_number === requestedB)) setNumB(requestedB);
+  }, [drivers]);
 
   useEffect(() => {
     if (!sessionKey || numA == null || numB == null || numA === numB) return;

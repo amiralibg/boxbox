@@ -53,11 +53,35 @@ export default function ReplayPage() {
   const [geometryNote, setGeometryNote] = useState<string | null>(null);
 
   useEffect(() => {
+    const requestedYear = Number(new URLSearchParams(window.location.search).get("year"));
+    if (YEARS.includes(requestedYear)) setYear(requestedYear);
+  }, []);
+
+  useEffect(() => {
+    let stale = false;
     setSessions([]);
     setMeetingKey(null);
     setSessionKey(null);
-    getJson<SessionInfo[]>(`/api/sessions?year=${year}`).then(setSessions).catch((e) => setError(String(e)));
+    getJson<SessionInfo[]>(`/api/sessions?year=${year}`)
+      .then((next) => {
+        if (!stale) setSessions(next);
+      })
+      .catch((e) => {
+        if (!stale) setError(String(e));
+      });
+    return () => {
+      stale = true;
+    };
   }, [year]);
+
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    const requestedSession = Number(new URLSearchParams(window.location.search).get("session"));
+    const selected = sessions.find((session) => session.session_key === requestedSession);
+    if (!selected) return;
+    setMeetingKey(selected.meeting_key);
+    setSessionKey(selected.session_key);
+  }, [sessions]);
 
   const meetings = useMemo(() => {
     const seen = new Map<number, SessionInfo>();
