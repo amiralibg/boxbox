@@ -23,9 +23,9 @@ function ThemeToggle({ className = "" }: { className?: string }) {
       aria-label="Switch theme"
       className={`font-mono text-[10px] tracking-[0.3em] ${className}`}
     >
-      <span className={theme === "paper" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>PAPER</span>
+      <span className={theme === "dark" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>DARK</span>
       <span className="text-ink-3"> / </span>
-      <span className={theme === "dark" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>NIGHT</span>
+      <span className={theme === "paper" ? "text-ink" : "text-ink-3 transition-colors hover:text-ink-2"}>LIGHT</span>
     </button>
   );
 }

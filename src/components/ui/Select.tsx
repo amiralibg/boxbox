@@ -56,7 +56,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           <RadixSelect.Content
             position="popper"
             sideOffset={6}
-            className="z-[60] max-h-[min(340px,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)] min-w-[220px] overflow-hidden border border-ink/25 bg-paper shadow-[0_16px_40px_-12px_rgba(28,23,16,0.35)]"
+            className="z-[60] max-h-[min(340px,var(--radix-select-content-available-height))] w-[var(--radix-select-trigger-width)] min-w-[220px] overflow-hidden border border-ink/25 bg-paper shadow-[0_16px_40px_-12px_var(--shadow-color)]"
           >
             <RadixSelect.ScrollUpButton className="flex h-6 items-center justify-center text-ink-3">
               <Chevron className="rotate-180" />

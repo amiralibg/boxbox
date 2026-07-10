@@ -74,7 +74,7 @@ export default function RecapPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="05" title="Recap" sub="Any driver, any season since 1950 — one shareable card." />
+      <PageTitle index="05" title="Recap" sub="Wins, podiums, poles, fastest laps and the cumulative points arc vs the title rival. 1950–present, exportable." />
 
       {error && (
         <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
@@ -109,7 +109,7 @@ export default function RecapPage() {
                   key={a.value}
                   title={a.name}
                   onClick={() => setAccent(a.value)}
-                  className={`h-7 w-7 rounded-full transition-transform hover:scale-110 ${
+                  className={`h-7 w-7 rounded-full border border-ink/25 transition-transform hover:scale-110 ${
                     accent === a.value ? "ring-2 ring-ink ring-offset-2 ring-offset-paper" : ""
                   }`}
                   style={{ backgroundColor: a.value }}
@@ -136,7 +136,7 @@ export default function RecapPage() {
 
           <div
             ref={svgHost}
-            className="recap-host mt-6 overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_rgba(28,23,16,0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+            className="recap-host mt-6 overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_var(--shadow-color)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
           >
             {data ? (
               <RecapCard key={`${data.driverId}-${data.year}-${accent}`} data={data} accent={accent} />

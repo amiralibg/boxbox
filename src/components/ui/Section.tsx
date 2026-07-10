@@ -19,7 +19,7 @@ export function PageTitle({ title, sub, index }: { title: string; sub: string; i
       <div className="min-w-0">
         {index && (
           <span className="font-mono text-[11px] tracking-[0.3em] text-red">
-            Nº {index}
+            {index}
           </span>
         )}
         <h1 className="display mt-2 text-[42px] font-black leading-[0.98] md:text-[58px]">

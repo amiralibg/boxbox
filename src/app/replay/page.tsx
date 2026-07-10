@@ -86,7 +86,7 @@ export default function ReplayPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="03" title="Replay" sub="A whole session, every car. First load bakes it from OpenF1 (~1 min), then it's instant." />
+      <PageTitle index="03" title="Replay" sub="Full-session playback: 20 cars at 2 Hz, race order, gaps, sector times. First load ~1 min, cached after." />
 
       <Panel className="mt-6 p-4 md:p-5">
         <div className="grid grid-cols-2 gap-3 md:max-w-2xl md:grid-cols-3 md:gap-4">
@@ -122,7 +122,7 @@ export default function ReplayPage() {
         </div>
         {loading && (
           <div className="mt-4">
-            <LoadingLine>Baking session… first time takes about a minute, instant afterwards</LoadingLine>
+            <LoadingLine>Building session data — ~25 OpenF1 fetches, 60–90 s first time, cached after</LoadingLine>
           </div>
         )}
       </Panel>
@@ -131,12 +131,12 @@ export default function ReplayPage() {
         <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
 
-      {loading && !blob && <StageSkeleton label="BAKING SESSION" note="20 CARS · 2 HZ" sidebarRows={12} />}
+      {loading && !blob && <StageSkeleton label="BUILDING SESSION" note="20 CARS · 2 HZ" sidebarRows={12} />}
 
       {!loading && !blob && !error && (
         <EmptyState
           title="No session loaded"
-          hint="Pick a season, grand prix and session above to replay every car — running order, gaps, tyres and lap times included."
+          hint="Pick a season, grand prix and session above. Playback covers running order, gaps, race control, pit stops, stints and lap times."
         />
       )}
 

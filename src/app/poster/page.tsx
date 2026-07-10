@@ -69,7 +69,7 @@ export default function PosterPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="01" title="Circuit posters" sub="Official live-timing geometry, 2025 calendar. Print-ready SVG or PNG." />
+      <PageTitle index="01" title="Circuit posters" sub="Circuit geometry from F1 live-timing coordinates, 2025 calendar. SVG or PNG at 2×." />
       <div className="mt-6 flex flex-col gap-8 md:mt-8 lg:flex-row lg:gap-10">
         {/* controls */}
         <aside className="w-full shrink-0 lg:w-[300px]">
@@ -109,7 +109,7 @@ export default function PosterPage() {
                   key={a.value}
                   title={a.name}
                   onClick={() => setAccent(a.value)}
-                  className={`h-8 w-8 rounded-full transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
+                  className={`h-8 w-8 rounded-full border border-ink/25 transition-transform hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
                     accent === a.value ? "ring-2 ring-ink ring-offset-2 ring-offset-paper" : ""
                   }`}
                   style={{ backgroundColor: a.value }}
@@ -149,7 +149,7 @@ export default function PosterPage() {
         <section className="flex min-w-0 flex-1 items-start justify-center">
           <div
             ref={svgHost}
-            className="w-full max-w-[560px] overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_rgba(28,23,16,0.45)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
+            className="w-full max-w-[560px] overflow-hidden border border-ink/15 shadow-[0_24px_60px_-24px_var(--shadow-color)] [&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
           >
             {circuit ? (
               <Poster circuit={circuit} accent={accent} showCorners={showCorners} round={round > 0 ? round : undefined} />

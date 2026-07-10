@@ -156,7 +156,7 @@ export default function LivePage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="06" title="Live" sub="Free-tier delayed feed, near-live. Simulation replays a finished session through the identical pipeline." />
+      <PageTitle index="06" title="Live" sub="Positions, order and gaps over SSE, polled from OpenF1 every 4 s. Simulation runs any past session through the same pipeline." />
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <Select
@@ -208,7 +208,7 @@ export default function LivePage() {
       {status === "idle" && !error && (
         <EmptyState
           title="Feed not connected"
-          hint="Pick a session and hit Connect. Simulate replays a finished session as if it were live — crank the clock to fast-forward."
+          hint="Pick a session and connect. Simulate replays a finished session as if live; the clock multiplier fast-forwards it."
         />
       )}
 

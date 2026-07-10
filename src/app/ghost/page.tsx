@@ -116,7 +116,7 @@ export default function GhostPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="02" title="Ghost lab" sub="Two fastest laps on one track — sector by sector, corner by corner." />
+      <PageTitle index="02" title="Ghost lab" sub="Two fastest laps overlaid: 20 Hz telemetry, time delta by lap fraction, sectors and minisectors." />
 
       <Panel className="mt-6 p-4 md:p-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
@@ -168,7 +168,7 @@ export default function GhostPage() {
         </div>
         {loading && (
           <div className="mt-4">
-            <LoadingLine>Baking laps from OpenF1… first time for a driver takes a few seconds</LoadingLine>
+            <LoadingLine>Fetching and resampling telemetry — a few seconds per driver first time, cached after</LoadingLine>
           </div>
         )}
       </Panel>
@@ -181,8 +181,8 @@ export default function GhostPage() {
 
       {!loading && !laps && !error && (
         <EmptyState
-          title="No laps on track yet"
-          hint="Pick a season, grand prix and session above, then choose two drivers to race their fastest laps against each other."
+          title="No laps loaded"
+          hint="Pick a season, grand prix and session above, then choose two drivers to compare their fastest laps."
         />
       )}
 

@@ -28,7 +28,7 @@ export default function NumbersPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="04" title="The Numbers" sub="Every season since 1950, queried in your browser. No server involved." />
+      <PageTitle index="04" title="The Numbers" sub="F1DB 1950–present in in-browser DuckDB. Head-to-head splits and points recomputation, no server." />
 
       <div className="mt-6 flex gap-0 border-b border-ink/20">
         {(

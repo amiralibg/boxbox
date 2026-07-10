@@ -6,12 +6,12 @@ import { fetchCircuit } from "@/lib/circuits";
 import { makeProjector, toClosedPath, type BakedCircuit } from "@/lib/track/geometry";
 
 const TOOLS = [
-  { href: "/poster", n: "01", title: "Circuit posters", blurb: "Exact circuit geometry from official live-timing data — every circuit on the calendar, exportable SVG/PNG." },
-  { href: "/ghost", n: "02", title: "Ghost lab", blurb: "Two fastest laps on one track, sector by sector, with full telemetry underneath." },
-  { href: "/replay", n: "03", title: "Replay", blurb: "A whole session, every car — running order, gaps, tyres and lap times." },
-  { href: "/numbers", n: "04", title: "The Numbers", blurb: "Every season since 1950, queried in your browser. Teammate duels and what-if title fights." },
-  { href: "/recap", n: "05", title: "Recap", blurb: "Any driver, any season — one shareable card." },
-  { href: "/live", n: "06", title: "Live", blurb: "Race weekends near-live on the free-tier delayed feed, or simulate a past session." },
+  { href: "/poster", n: "01", title: "Circuit posters", blurb: "Circuit geometry from F1 live-timing coordinates, all 24 rounds. SVG/PNG export." },
+  { href: "/ghost", n: "02", title: "Ghost lab", blurb: "Two laps overlaid at 20 Hz: speed, throttle, brake, gear, DRS, time delta by track position." },
+  { href: "/replay", n: "03", title: "Replay", blurb: "Full-session playback, 20 cars: race order, gaps, flags, pit stops, stints, sector times." },
+  { href: "/numbers", n: "04", title: "The Numbers", blurb: "1950–present in in-browser DuckDB. Teammate head-to-head and what-if points recomputation." },
+  { href: "/recap", n: "05", title: "Recap", blurb: "Per-season driver stats and cumulative points arc vs the title rival. Exportable card." },
+  { href: "/live", n: "06", title: "Live", blurb: "Delayed live positions over SSE, or any past session simulated through the same pipeline." },
 ];
 
 /** Front page: oversized serif headline over a bare ink track line. */
@@ -36,8 +36,8 @@ export default function Home() {
             <span className="font-light italic">every signal.</span>
           </h1>
           <p className="mt-6 max-w-md text-[15px] leading-relaxed text-ink-2">
-            Telemetry replays, ghost laps, circuit posters and seventy-five seasons of championship
-            arithmetic — built on the same timing data the pit wall reads.
+            Session replays, lap-delta telemetry, circuit geometry and 75 seasons of results —
+            from F1 live-timing data (OpenF1) and F1DB.
           </p>
         </div>
         <div className="hidden md:block" aria-hidden>
@@ -56,8 +56,8 @@ export default function Home() {
       <section className="pb-10">
         <div className="rule-double pb-[5px]" />
         <div className="flex items-baseline justify-between pb-2 pt-3">
-          <h2 className="font-mono text-[11px] tracking-[0.3em] text-ink-3">CONTENTS</h2>
-          <span className="font-mono text-[11px] tracking-[0.3em] text-ink-3">SIX TOOLS</span>
+          <h2 className="font-mono text-[11px] tracking-[0.3em] text-ink-3">TOOLS</h2>
+          <span className="font-mono text-[11px] tracking-[0.3em] text-ink-3">06</span>
         </div>
         <ol>
           {TOOLS.map((t) => (
