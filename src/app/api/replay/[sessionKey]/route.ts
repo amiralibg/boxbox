@@ -2,14 +2,14 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { openf1 } from "@/lib/server/openf1";
-import { makeGrid, resampleLinear, type TimedSample } from "@/lib/telemetry/resample";
+import { makeGrid, resampleCatmullRom, resampleLinear, type TimedSample } from "@/lib/telemetry/resample";
 import type { ReplayBlob, ReplayDriver } from "@/lib/replay/types";
 import type { DriverInfo, SessionInfo } from "@/lib/telemetry/types";
 
-const POS_HZ = 2;
+const POS_HZ = 4;
 const GAP_HZ = 0.25;
 /** bump to invalidate every cached blob — the version is part of the filename */
-const BAKE_VERSION = 2;
+const BAKE_VERSION = 3;
 const BAKE_DIR = path.join(process.cwd(), ".cache", "replay");
 
 interface LocationRow {
@@ -36,6 +36,7 @@ interface IntervalRow {
   date: string;
   driver_number: number;
   gap_to_leader: number | string | null;
+  interval: number | string | null;
 }
 
 interface LapRow {
@@ -69,6 +70,29 @@ interface PitRow {
   driver_number: number;
   lap_number: number;
   pit_duration: number | null;
+  stop_duration?: number | null;
+}
+
+interface OvertakeRow {
+  date: string;
+  overtaking_driver_number: number;
+  overtaken_driver_number: number;
+  position: number | null;
+}
+
+interface StartingGridRow {
+  driver_number: number;
+  position: number;
+  lap_duration: number | null;
+}
+
+interface SessionResultRow {
+  driver_number: number;
+  position: number | null;
+  points: number | null;
+  dnf: boolean;
+  dns: boolean;
+  dsq: boolean;
 }
 
 interface WeatherRow {
@@ -119,10 +143,17 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     if (clean.length < 10) continue; // no usable data (DNS etc.)
     const xs: TimedSample[] = clean.map((r) => ({ t: (Date.parse(r.date) - t0) / 1000, v: r.x }));
     const ys: TimedSample[] = clean.map((r) => ({ t: (Date.parse(r.date) - t0) / 1000, v: r.y }));
+    const missing: [number, number][] = [];
+    for (let i = 1; i < clean.length; i++) {
+      const start = (Date.parse(clean[i - 1].date) - t0) / 1000;
+      const end = (Date.parse(clean[i].date) - t0) / 1000;
+      if (end - start > 6) missing.push([Math.round(start * 10) / 10, Math.round(end * 10) / 10]);
+    }
     pos[d.num] = {
-      x: resampleLinear(xs, grid).map(Math.round),
-      y: resampleLinear(ys, grid).map(Math.round),
+      x: resampleCatmullRom(xs, grid).map(Math.round),
+      y: resampleCatmullRom(ys, grid).map(Math.round),
       lastT: Math.round(xs[xs.length - 1].t),
+      missing,
     };
   }
 
@@ -135,16 +166,30 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
 
   const gapGrid = makeGrid(duration, GAP_HZ);
   const gaps: ReplayBlob["gaps"] = {};
+  const intervals: NonNullable<ReplayBlob["intervals"]> = {};
+  const lapGaps: NonNullable<ReplayBlob["lapGaps"]> = {};
   try {
     const intervalRows = await openf1<IntervalRow[]>("intervals", { session_key: sessionKey });
     for (const d of drivers) {
       const rows = intervalRows.filter((r) => r.driver_number === d.num && typeof r.gap_to_leader === "number");
-      if (rows.length < 2) continue;
-      const samples: TimedSample[] = rows.map((r) => ({
-        t: (Date.parse(r.date) - t0) / 1000,
-        v: r.gap_to_leader as number,
-      }));
-      gaps[d.num] = resampleLinear(samples, gapGrid).map((v) => Math.round(v * 10) / 10);
+      if (rows.length >= 2) {
+        const samples: TimedSample[] = rows.map((r) => ({
+          t: (Date.parse(r.date) - t0) / 1000,
+          v: r.gap_to_leader as number,
+        }));
+        gaps[d.num] = resampleLinear(samples, gapGrid).map((v) => Math.round(v * 10) / 10);
+      }
+      const aheadRows = intervalRows.filter((r) => r.driver_number === d.num && typeof r.interval === "number");
+      if (aheadRows.length >= 2) {
+        intervals[d.num] = resampleLinear(
+          aheadRows.map((r) => ({ t: (Date.parse(r.date) - t0) / 1000, v: r.interval as number })),
+          gapGrid,
+        ).map((v) => Math.round(v * 10) / 10);
+      }
+      const labels = intervalRows
+        .filter((r) => r.driver_number === d.num && typeof r.gap_to_leader === "string")
+        .map((r) => ({ t: Math.round(((Date.parse(r.date) - t0) / 1000) * 10) / 10, label: String(r.gap_to_leader) }));
+      if (labels.length) lapGaps[d.num] = labels;
     }
   } catch {
     // intervals exist only for races — quali/practice replays just skip gaps
@@ -199,6 +244,7 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
       lap: p.lap_number,
       t: Math.round(((Date.parse(p.date) - t0) / 1000) * 10) / 10,
       durationS: p.pit_duration,
+      stopDurationS: p.stop_duration ?? null,
     });
   }
 
@@ -228,25 +274,56 @@ async function bake(sessionKey: number): Promise<ReplayBlob> {
     (radio[r.driver_number] ??= []).push({ t, url: r.recording_url });
   }
 
+  const [overtakeRows, gridRows, resultRows] = await Promise.all([
+    openf1<OvertakeRow[]>("overtakes", { session_key: sessionKey }).catch(() => [] as OvertakeRow[]),
+    openf1<StartingGridRow[]>("starting_grid", { session_key: sessionKey }).catch(() => [] as StartingGridRow[]),
+    openf1<SessionResultRow[]>("session_result", { session_key: sessionKey }).catch(() => [] as SessionResultRow[]),
+  ]);
+  const overtakes = overtakeRows.map((row) => ({
+    t: Math.round(((Date.parse(row.date) - t0) / 1000) * 10) / 10,
+    overtaking: row.overtaking_driver_number,
+    overtaken: row.overtaken_driver_number,
+    position: row.position,
+  })).filter((event) => event.t >= 0 && event.t <= duration);
+  const startingGrid = gridRows.map((row) => ({ num: row.driver_number, pos: row.position, lapDuration: row.lap_duration }));
+  for (const gridEntry of startingGrid) {
+    if (!order.some((event) => event.num === gridEntry.num && event.t === 0)) {
+      order.push({ t: 0, num: gridEntry.num, pos: gridEntry.pos });
+    }
+  }
+  order.sort((a, b) => a.t - b.t);
+  const result = resultRows.map((row) => ({
+    num: row.driver_number,
+    pos: row.position,
+    status: row.dsq ? "DSQ" : row.dns ? "DNS" : row.dnf ? "DNF" : "CLASSIFIED",
+    points: row.points,
+  }));
+
   return {
     version: BAKE_VERSION,
     sessionKey,
     sessionName: session.session_name,
     circuitKey: session.circuit_key,
+    sessionYear: session.year,
     t0: session.date_start,
     duration,
     hz: POS_HZ,
-    drivers: drivers.filter((d) => pos[d.num]),
+    drivers,
     pos,
     order,
     gapHz: GAP_HZ,
     gaps,
+    intervals,
+    lapGaps,
     stints,
     laps,
     raceControl,
     pits,
     weather,
     radio,
+    overtakes,
+    startingGrid,
+    result,
   };
 }
 

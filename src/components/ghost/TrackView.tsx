@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { drawCar, headingBetween } from "@/lib/track/carMarker";
+import { drawTelemetryMarker, headingBetween } from "@/lib/track/carMarker";
 import { makeProjector, type BakedCircuit, type Pt } from "@/lib/track/geometry";
 import { sampleLap } from "@/lib/telemetry/sample";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
@@ -22,6 +22,7 @@ export interface GhostEntry {
  */
 export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; ghosts: GhostEntry[]; player: TelemetryPlayer }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -31,6 +32,9 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
     let trackPath: Path2D | null = null;
     let w = 0;
     let h = 0;
+    let hits: { id: number; x: number; y: number; label: string; color: string }[] = [];
+    let pointer: { x: number; y: number } | null = null;
+    let pinnedId: number | null = null;
 
     const rebuild = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -51,6 +55,7 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
       if (!projector || !trackPath) return;
       const proj = projector;
       ctx.clearRect(0, 0, w, h);
+      hits = [];
 
       // track bed
       const pal = chartPalette();
@@ -91,21 +96,55 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
         }
         ctx.globalAlpha = 1;
 
-        // car marker, headed along travel direction
+        // compact directional telemetry marker
         const f = sampleLap(g.lap, t);
         const ahead = sampleLap(g.lap, Math.min(t + 0.12, g.lap.lapDuration));
         const [px, py] = proj.project([f.x, f.y] as Pt);
         const [qx, qy] = proj.project([ahead.x, ahead.y] as Pt);
         const heading = headingBetween(px, py, qx, qy, headings.get(gi) ?? 0);
         headings.set(gi, heading);
-        drawCar(ctx, px, py, heading, g.color, 1.35, { glow: true });
-
-        // label — staggered per ghost so close cars don't overprint
-        ctx.font = "600 11px 'Space Grotesk', sans-serif";
-        ctx.fillStyle = g.color;
-        const ly = gi % 2 === 0 ? py - 16 : py + 24;
-        ctx.fillText(g.label, px + 14, ly);
+        drawTelemetryMarker(ctx, px, py, heading, g.color, 1.15, { glow: true, outline: pal.trackBed });
+        hits.push({ id: gi, x: px, y: py, label: g.label, color: g.color });
       });
+      updateTooltip();
+    };
+
+    function updateTooltip() {
+      if (!canvas) return;
+      const hoverHit = pointer
+        ? [...hits].reverse().find((item) => Math.hypot(item.x - pointer!.x, item.y - pointer!.y) <= 15)
+        : undefined;
+      const hit = pinnedId == null ? hoverHit : hits.find((item) => item.id === pinnedId);
+      const tooltip = tooltipRef.current;
+      if (!tooltip) return;
+      canvas.style.cursor = hoverHit ? "pointer" : "default";
+      if (!hit) {
+        tooltip.style.opacity = "0";
+        return;
+      }
+      tooltip.textContent = hit.label;
+      tooltip.style.left = `${Math.min(w - 110, Math.max(8, hit.x + 14))}px`;
+      tooltip.style.top = `${Math.max(8, hit.y - 30)}px`;
+      tooltip.style.borderColor = hit.color;
+      tooltip.style.opacity = "1";
+    }
+    const onPointerMove = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      updateTooltip();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      const point = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const hit = [...hits].reverse().find((item) => Math.hypot(item.x - point.x, item.y - point.y) <= 22);
+      pinnedId = hit && pinnedId !== hit.id ? hit.id : null;
+      pointer = event.pointerType === "mouse" ? point : null;
+      updateTooltip();
+    };
+    const onPointerLeave = () => {
+      pointer = null;
+      canvas.style.cursor = "default";
+      if (pinnedId == null && tooltipRef.current) tooltipRef.current.style.opacity = "0";
     };
 
     rebuild();
@@ -116,11 +155,25 @@ export function TrackView({ circuit, ghosts, player }: { circuit: BakedCircuit; 
       draw(player.t);
     });
     ro.observe(canvas);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointerleave", onPointerLeave);
     return () => {
       unsub();
       ro.disconnect();
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
     };
   }, [circuit, ghosts, player]);
 
-  return <canvas ref={canvasRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <canvas ref={canvasRef} className="h-full w-full touch-manipulation" aria-label="Interactive lap comparison track. Hover or tap a marker to identify the driver." />
+      <div ref={tooltipRef} className="pointer-events-none absolute z-10 max-w-[calc(100%-1rem)] overflow-hidden text-ellipsis whitespace-nowrap border-l-2 bg-paper px-2 py-1 font-mono text-[9px] text-ink opacity-0 shadow-lg transition-opacity" />
+      <span className="pointer-events-none absolute bottom-2 left-2 bg-paper/90 px-1.5 py-1 font-mono text-[8px] tracking-[0.12em] text-ink-3 md:hidden">
+        TAP MARKER · DRIVER ID
+      </span>
+    </div>
+  );
 }

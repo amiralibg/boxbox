@@ -1,10 +1,8 @@
 <p align="center">
-  <img src="src/app/icon.svg" width="96" alt="BoxBox logo — a circuit loop shaped like the letter B">
+  <img src="public/brand/boxbox-logo.svg" width="360" alt="BoxBox — Formula One Data System">
 </p>
 
-<h1 align="center">BoxBox</h1>
-
-<p align="center"><strong>F1 race lab</strong> — telemetry replays, ghost laps, circuit posters and championship analysis, all in the browser.</p>
+<p align="center"><strong>Formula One data system</strong> — telemetry replay, lap comparison, technical analysis and configurable exports.</p>
 
 ---
 
@@ -12,12 +10,12 @@
 
 | Route | What it does |
 | --- | --- |
-| `/poster` | Print-ready circuit posters from official live-timing geometry — SVG/PNG export, all 24 circuits |
-| `/ghost` | Two fastest laps overlaid on one track: live delta, sector times, minisectors, speed trap, tyre |
-| `/replay` | Whole-session replay, every car — running order, gap chart, tyre strategy, lap-by-lap timing sheet |
-| `/numbers` | Teammate head-to-head and what-if title calculator over every season since 1950, queried in-browser with DuckDB WASM |
-| `/recap` | Shareable season recap card for any driver since 1950 |
-| `/live` | Live session viewer — delayed REST feed streamed over SSE with smooth client-side playback; simulation mode replays any finished session through the same pipeline |
+| `/lab/replay` | Whole-session reconstruction from position, timing, race-control, weather, pit and telemetry channels |
+| `/lab/ghost` | Two fastest laps overlaid with synchronized telemetry, sector data and exact finish delta |
+| `/lab/h2h` | Technical teammate comparison across qualifying, races, points and reliability |
+| `/studio/poster` | Configurable circuit plates from season-specific geometry with SVG/PNG export |
+| `/studio/scenarios` | Championship recomputation with configurable rounds, outcomes and scoring systems |
+| `/studio/recap` | Configurable driver season summaries covering every available historical season |
 
 ## Stack
 
@@ -33,6 +31,9 @@ pnpm install        # postinstall copies DuckDB wasm into public/duckdb/
 pnpm dev
 ```
 
+Set `NEXT_PUBLIC_SITE_URL` to the production origin so canonical URLs, the sitemap,
+robots file and social metadata use the deployed domain.
+
 First telemetry request per session/driver bakes from OpenF1 onto disk (`.cache/`, gitignored) — a full race replay takes about a minute once, then loads instantly.
 
 ```bash
@@ -42,4 +43,4 @@ pnpm bake:circuits [year]   # refresh circuit geometry in public/circuits/
 ## Notes
 
 - OpenF1 free tier is rate-limited (~3 req/s); the server client queues and disk-caches every response.
-- Live mode ships with the free delayed REST feed; SignalR / sponsor-token stream feeds slot in behind the same `LiveFeed` interface (token exchange stays server-side).
+- Telemetry availability follows OpenF1 (2023 onward); historical result analysis follows F1DB (1950 onward).

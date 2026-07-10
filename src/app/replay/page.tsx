@@ -8,20 +8,23 @@ import { ReplayTrack } from "@/components/replay/ReplayTrack";
 import { ScrubBar } from "@/components/replay/ScrubBar";
 import { StintPaceChart } from "@/components/replay/StintPaceChart";
 import { WeatherStrip } from "@/components/replay/WeatherStrip";
+import { DriverTelemetryPanel } from "@/components/replay/DriverTelemetryPanel";
+import { TeamRadioPanel } from "@/components/replay/TeamRadioPanel";
 import { LoadingLine, StageSkeleton } from "@/components/ui/Loading";
 import { EmptyState, PageTitle, Panel, SectionLabel } from "@/components/ui/Section";
 import { Select } from "@/components/ui/Select";
 import { compoundStyle, SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { teamColor } from "@/lib/color";
 import { useTheme } from "@/lib/theme";
-import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
+import { fetchResolvedCircuit } from "@/lib/circuits";
 import { deriveFastestLaps, deriveOvertakes, deriveTrackStatus } from "@/lib/replay/derive";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
-import { gapAt, orderAt, type ReplayBlob, type ReplayLap } from "@/lib/replay/types";
+import { gapAt, lapGapAt, orderAt, type ReplayBlob, type ReplayLap } from "@/lib/replay/types";
 import type { BakedCircuit } from "@/lib/track/geometry";
 import type { SessionInfo } from "@/lib/telemetry/types";
+import { openF1SeasonCatalog } from "@/lib/seasons";
 
-const YEARS = [2023, 2024, 2025, 2026];
+const YEARS = openF1SeasonCatalog().map((entry) => entry.year);
 const SPEEDS = [1, 5, 15, 30, 60];
 
 const fmtClock = (s: number) => {
@@ -39,7 +42,7 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 export default function ReplayPage() {
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(YEARS[0]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetingKey, setMeetingKey] = useState<number | null>(null);
   const [sessionKey, setSessionKey] = useState<number | null>(null);
@@ -47,6 +50,7 @@ export default function ReplayPage() {
   const [circuit, setCircuit] = useState<BakedCircuit | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geometryNote, setGeometryNote] = useState<string | null>(null);
 
   useEffect(() => {
     setSessions([]);
@@ -72,15 +76,13 @@ export default function ReplayPage() {
     setError(null);
     setBlob(null);
     (async () => {
-      const index = await fetchCircuitIndex();
-      const entry = index.find((c) => c.circuitKey === session.circuit_key);
-      if (!entry) throw new Error(`no baked geometry for ${session.circuit_short_name}`);
-      const [circ, replayBlob] = await Promise.all([
-        fetchCircuit(entry.slug),
+      const [resolved, replayBlob] = await Promise.all([
+        fetchResolvedCircuit(session.circuit_key, session.year),
         getJson<ReplayBlob>(`/api/replay/${sessionKey}`),
       ]);
       if (stale) return;
-      setCircuit(circ);
+      setCircuit(resolved.circuit);
+      setGeometryNote(resolved.resolution.exact ? null : `Track geometry: ${resolved.resolution.entry.year} layout (exact ${session.year} layout unavailable)`);
       setBlob(replayBlob);
     })()
       .catch((e) => !stale && setError(String(e)))
@@ -92,7 +94,7 @@ export default function ReplayPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="03" title="Replay" sub="Full-session playback: 20 cars at 2 Hz, race order, gaps, sector times. First load ~1 min, cached after." />
+      <PageTitle index="LAB / SESSION.01" title="Session replay" sub="4 Hz position reconstruction with order, leader/ahead gaps, race control, strategy, lap timing and lazy driver telemetry." />
 
       <Panel className="mt-6 p-4 md:p-5">
         <div className="grid grid-cols-2 gap-3 md:max-w-2xl md:grid-cols-3 md:gap-4">
@@ -136,8 +138,9 @@ export default function ReplayPage() {
       {error && (
         <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
+      {geometryNote && <div className="mt-4 border border-ochre/30 bg-ochre/5 px-4 py-3 font-mono text-[10px] text-ochre">{geometryNote}</div>}
 
-      {loading && !blob && <StageSkeleton label="BUILDING SESSION" note="20 CARS · 2 HZ" sidebarRows={12} />}
+      {loading && !blob && <StageSkeleton label="BUILDING SESSION" note="20 CARS · 4 HZ" sidebarRows={12} />}
 
       {!loading && !blob && !error && (
         <EmptyState
@@ -156,7 +159,8 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeedState] = useState(15);
   const [highlight, setHighlight] = useState<Set<number>>(new Set());
-  const [rows, setRows] = useState<{ num: number; pos: number; gap: number | null }[]>([]);
+  const [telemetryDriver, setTelemetryDriver] = useState(blob.drivers[0]?.num ?? 0);
+  const [rows, setRows] = useState<{ num: number; pos: number; gap: number | null; lapGap: string | null; ahead: number | null }[]>([]);
   const clockRef = useRef<HTMLSpanElement>(null);
   const scrubRef = useRef<HTMLInputElement>(null);
 
@@ -188,11 +192,17 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
       lastBoard = t;
       const order = orderAt(blob.order, t);
       const board = blob.drivers
-        .map((d) => ({ num: d.num, pos: order.get(d.num) ?? 99, gap: blob.gaps[d.num] ? gapAt(blob.gaps[d.num], blob.gapHz, t) : null }))
+        .map((d) => ({
+          num: d.num,
+          pos: order.get(d.num) ?? 99,
+          gap: blob.gaps[d.num] ? gapAt(blob.gaps[d.num], blob.gapHz, t) : null,
+          lapGap: lapGapAt(blob.lapGaps?.[d.num], t),
+          ahead: blob.intervals?.[d.num] ? gapAt(blob.intervals[d.num], blob.gapHz, t) : null,
+        }))
         .sort((a, b) => a.pos - b.pos);
       setRows(board);
     });
-    player.seek(60);
+    player.seek(0);
     return () => {
       unsub();
       player.destroy();
@@ -211,7 +221,12 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
 
   // derived race events — client-side so heuristics can change without re-bakes
   const status = useMemo(() => deriveTrackStatus(blob.raceControl ?? []), [blob]);
-  const overtakes = useMemo(() => deriveOvertakes(blob.order, blob.pits ?? {}), [blob]);
+  const overtakes = useMemo(
+    () => blob.overtakes?.length
+      ? blob.overtakes.map((event) => ({ t: event.t, num: event.overtaking, passed: event.overtaken, pos: event.position ?? orderAt(blob.order, event.t).get(event.overtaking) ?? 0, pitCycle: false }))
+      : deriveOvertakes(blob.order, blob.pits ?? {}),
+    [blob],
+  );
   const fastestLaps = useMemo(() => deriveFastestLaps(blob.laps ?? {}), [blob]);
   const pitRows: TimingRow[] = useMemo(() => {
     const all = Object.entries(blob.pits ?? {}).flatMap(([num, stops]) =>
@@ -225,6 +240,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
         driver: { text: byNum.get(p.num)?.acronym ?? `#${p.num}`, color: colors.get(p.num) },
         lap: { text: `L${p.lap}`, tone: "muted" as const },
         dur: p.durationS == null ? { text: "—", tone: "muted" as const } : { text: p.durationS.toFixed(1), tone: i === 0 ? ("best" as const) : ("default" as const) },
+        stop: p.stopDurationS == null ? { text: "—", tone: "muted" as const } : { text: p.stopDurationS.toFixed(1), tone: "default" as const },
       },
     }));
   }, [blob, byNum, colors]);
@@ -316,14 +332,43 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
                 <span className="h-3.5 w-[3px] shrink-0" style={{ backgroundColor: colors.get(r.num) }} />
                 <span className="text-[13px] font-semibold">{d.acronym}</span>
                 <span className="ml-auto font-mono text-[12px] tabular-nums text-ink-2">
-                  {r.pos === 1 ? "LEADER" : r.gap != null ? `+${r.gap.toFixed(1)}` : "—"}
+                  {r.pos === 1 ? "LEADER" : r.lapGap ?? (r.gap != null ? `+${r.gap.toFixed(1)}` : "—")}
                 </span>
+                {r.pos > 1 && r.ahead != null && <span className="w-12 font-mono text-[9px] text-ink-3">INT {r.ahead.toFixed(1)}</span>}
               </button>
             );
           })}
           {rows.length === 0 && <div className="px-4 py-10 text-center text-[13px] text-ink-3">Scrub into the session…</div>}
         </Panel>
       </div>
+
+      {telemetryDriver > 0 && (
+        <Panel className="mt-5 overflow-hidden">
+          <DriverTelemetryPanel blob={blob} player={player} selected={telemetryDriver} onSelect={setTelemetryDriver} />
+        </Panel>
+      )}
+
+      {Object.values(blob.radio ?? {}).some((clips) => clips.length > 0) && (
+        <Panel className="mt-5 overflow-hidden">
+          <TeamRadioPanel radio={blob.radio} drivers={byNum} player={player} />
+        </Panel>
+      )}
+
+      {(blob.result?.length ?? 0) > 0 && (
+        <Panel className="mt-5 overflow-hidden">
+          <div className="border-b border-ink/15 px-4 py-3"><SectionLabel>OFFICIAL SESSION CLASSIFICATION</SectionLabel></div>
+          <div className="grid gap-px bg-ink/10 sm:grid-cols-2 lg:grid-cols-4">
+            {[...(blob.result ?? [])].sort((a, b) => (a.pos ?? 99) - (b.pos ?? 99)).map((entry) => (
+              <div key={entry.num} className="flex items-center gap-3 bg-paper px-4 py-2 font-mono text-[10px]">
+                <span className="w-6 text-ink-3">{entry.pos ?? "—"}</span>
+                <strong>{byNum.get(entry.num)?.acronym ?? `#${entry.num}`}</strong>
+                <span className="ml-auto text-ink-3">{entry.status}</span>
+                {entry.points != null && <span>{entry.points} PTS</span>}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {((blob.raceControl ?? []).length > 0 || pitRows.length > 0) && (
         <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -348,6 +393,7 @@ function ReplayStage({ blob, circuit }: { blob: ReplayBlob; circuit: BakedCircui
                     { key: "driver", header: "DRV" },
                     { key: "lap", header: "LAP", align: "right" },
                     { key: "dur", header: "SECONDS", align: "right" },
+                    { key: "stop", header: "STATIONARY", align: "right" },
                   ]}
                   rows={pitRows}
                 />

@@ -68,6 +68,53 @@ export function drawCar(
   ctx.restore();
 }
 
+/**
+ * Compact directional marker for dense session views. It preserves heading
+ * without implying the lateral precision of a full car silhouette.
+ */
+export function drawTelemetryMarker(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  heading: number,
+  color: string,
+  size = 1,
+  opts: { glow?: boolean; alpha?: number; outline?: string } = {},
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(heading);
+  ctx.scale(size, size);
+  ctx.globalAlpha = opts.alpha ?? 1;
+  if (opts.glow) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 / size;
+  }
+
+  // Pointed nose, broad timing body and a notched tail: heading stays legible
+  // at small sizes while overlapping markers remain separable.
+  ctx.beginPath();
+  ctx.moveTo(8.5, 0);
+  ctx.lineTo(3.2, -4.5);
+  ctx.lineTo(-5.8, -4.5);
+  ctx.lineTo(-3.6, 0);
+  ctx.lineTo(-5.8, 4.5);
+  ctx.lineTo(3.2, 4.5);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = opts.outline ?? "rgba(255,255,255,0.72)";
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0.8, 0, 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = opts.outline ?? "#ffffff";
+  ctx.fill();
+  ctx.restore();
+}
+
 /** screen-space heading from two projected points; falls back to `prev` when stationary */
 export function headingBetween(ax: number, ay: number, bx: number, by: number, prev = 0): number {
   const dx = bx - ax;

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" role="img" aria-label="BoxBox">
+  <rect x="4" y="8" width="64" height="64" rx="8" fill="#080c0d"/>
+  <rect x="14" y="18" width="5" height="44" fill="#e10600"/>
+  <path d="M27 23h18l10 9-10 8H27l8-8-8-9Z" fill="#edf3f3"/>
+  <path d="M27 40h18l10 8-10 9H27l8-9-8-8Z" fill="#edf3f3" opacity=".72"/>
+  <circle cx="45" cy="32" r="3" fill="#e10600"/>
+  <text x="88" y="53" fill="#111718" font-family="Arial,Helvetica,sans-serif" font-size="42" font-weight="800" letter-spacing="-2">BOXBOX</text>
+  <rect x="88" y="62" width="238" height="2" fill="#e10600"/>
+  <text x="330" y="65" text-anchor="end" fill="#647275" font-family="monospace" font-size="7" letter-spacing="1.5">FORMULA ONE DATA SYSTEM</text>
+</svg>

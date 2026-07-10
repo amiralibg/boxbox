@@ -1,0 +1,15 @@
+.git
+.github
+.next
+.cache
+node_modules
+public/duckdb
+spikes/.cache
+spikes/out
+agent-transcripts
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+.DS_Store

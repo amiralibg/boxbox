@@ -11,6 +11,7 @@ import path from "node:path";
 
 const CACHE_DIR = path.join(process.cwd(), ".cache", "openf1");
 const PAUSE_MS = 400;
+const MAX_ATTEMPTS = 3;
 
 let queue: Promise<unknown> = Promise.resolve();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -39,11 +40,30 @@ export async function openf1<T>(
 
   // serialize network calls so parallel route handlers can't burst the API
   const task = queue.then(async () => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`OpenF1 ${endpoint}: ${res.status} ${res.statusText}`);
-    const data = (await res.json()) as T;
-    await sleep(PAUSE_MS);
-    return data;
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      let res: Response;
+      try {
+        res = await fetch(url);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt === MAX_ATTEMPTS - 1) throw lastError;
+        await sleep(600 * 2 ** attempt);
+        continue;
+      }
+      if (res.ok) {
+        const data = (await res.json()) as T;
+        await sleep(PAUSE_MS);
+        return data;
+      }
+      const detail = (await res.text()).slice(0, 180).replace(/\s+/g, " ");
+      lastError = new Error(`OpenF1 ${endpoint}: ${res.status} ${res.statusText}${detail ? ` — ${detail}` : ""}`);
+      const retryable = res.status === 429 || res.status >= 500;
+      if (!retryable || attempt === MAX_ATTEMPTS - 1) throw lastError;
+      const retryAfter = Number(res.headers.get("retry-after"));
+      await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 600 * 2 ** attempt);
+    }
+    throw lastError ?? new Error(`OpenF1 ${endpoint}: request failed`);
   });
   queue = task.catch(() => {});
   const data = await task;

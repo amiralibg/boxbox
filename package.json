@@ -8,6 +8,7 @@
     "spike:duckdb": "tsx spikes/duckdb-standings.ts",
     "dev": "next dev",
     "build": "next build",
+    "test": "vitest run",
     "start": "next start",
     "bake:circuits": "tsx scripts/bake-circuits.ts",
     "postinstall": "mkdir -p public/duckdb && cp node_modules/@duckdb/duckdb-wasm/dist/duckdb-eh.wasm node_modules/@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js public/duckdb/"
@@ -23,7 +24,8 @@
     "@types/react-dom": "^19.2.3",
     "tailwindcss": "^4.3.2",
     "tsx": "^4.23.0",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.33.1-dev57.0",

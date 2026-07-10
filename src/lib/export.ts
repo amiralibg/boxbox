@@ -7,8 +7,7 @@
  */
 
 const FONTS = [
-  { file: "/fonts/fraunces.woff2", family: "Fraunces", weight: "100 900", style: "normal" },
-  { file: "/fonts/fraunces-italic.woff2", family: "Fraunces", weight: "100 900", style: "italic" },
+  { file: "/fonts/space-grotesk.woff2", family: "Space Grotesk", weight: "300 700", style: "normal" },
   { file: "/fonts/jetbrains-mono.woff2", family: "JetBrains Mono", weight: "400 700", style: "normal" },
 ];
 

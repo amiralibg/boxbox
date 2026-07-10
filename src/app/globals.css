@@ -33,24 +33,22 @@
 }
 
 @theme {
-  /* paper — warm, print-like ground */
-  --color-paper: #f6f1e5;
-  --color-paper-2: #efe8d6;
-  --color-paper-3: #e5dcc4;
+  /* engineering workstation: neutral surfaces with high data contrast */
+  --color-paper: #f2f5f5;
+  --color-paper-2: #e8eded;
+  --color-paper-3: #d6dede;
 
-  /* warm ink scale */
-  --color-ink: #1c1710;
-  --color-ink-2: #5b5442;
-  --color-ink-3: #8d8470;
+  --color-ink: #111718;
+  --color-ink-2: #425052;
+  --color-ink-3: #718083;
 
-  /* the one accent */
-  --color-red: #c8102e;
-  --color-red-deep: #9d0a24;
+  --color-red: #e10600;
+  --color-red-deep: #b70500;
 
   /* supporting editorial hues (used sparingly: status, charts) */
-  --color-green: #1a7f4e;
-  --color-ochre: #a07d00;
-  --color-blue: #1e5aa8;
+  --color-green: #087f5b;
+  --color-ochre: #9a6900;
+  --color-blue: #1261a0;
 
   /* timing-screen conventions, remapped for paper */
   --color-sector-best: #6d28d9; /* overall best — F1 "purple" */
@@ -62,36 +60,37 @@
   --color-tyre-inter: #1a7f4e;
   --color-tyre-wet: #1e5aa8;
 
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-serif: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 /* chart + canvas chrome (not Tailwind tokens — read via chartPalette()) */
 :root {
-  --chart-grid: #e2dac2;
-  --chart-axis: #8d8470;
-  --track-bed: #e6dfca;
-  --shadow-color: rgba(28, 23, 16, 0.45);
+  --chart-grid: #d6dede;
+  --chart-axis: #718083;
+  --track-bed: #e1e7e7;
+  --shadow-color: rgba(17, 23, 24, 0.35);
+  --signal: #00a67d;
   color-scheme: light;
 }
 
-/* night — the same editorial system on a warm dark ground */
+/* night is the primary technical workspace */
 :root[data-theme="dark"] {
-  --color-paper: #171310;
-  --color-paper-2: #201a13;
-  --color-paper-3: #2c2418;
+  --color-paper: #080c0d;
+  --color-paper-2: #0e1415;
+  --color-paper-3: #172022;
 
-  --color-ink: #ece4d2;
-  --color-ink-2: #a99f89;
-  --color-ink-3: #7a715e;
+  --color-ink: #edf3f3;
+  --color-ink-2: #a3b0b2;
+  --color-ink-3: #647275;
 
-  --color-red: #e63b52;
-  --color-red-deep: #c8102e;
+  --color-red: #ff3b30;
+  --color-red-deep: #ff6b63;
 
-  --color-green: #3fae74;
-  --color-ochre: #cfa42a;
-  --color-blue: #6b9bd8;
+  --color-green: #26d09f;
+  --color-ochre: #f0b429;
+  --color-blue: #55a6e8;
 
   --color-sector-best: #a78bfa;
   --color-sector-pb: #3fae74;
@@ -102,10 +101,11 @@
   --color-tyre-inter: #3fae74;
   --color-tyre-wet: #6b9bd8;
 
-  --chart-grid: #2c2418;
-  --chart-axis: #7a715e;
-  --track-bed: #241e15;
+  --chart-grid: #1b2527;
+  --chart-axis: #647275;
+  --track-bed: #101719;
   --shadow-color: rgba(0, 0, 0, 0.65);
+  --signal: #30e3ad;
   color-scheme: dark;
 }
 
@@ -117,6 +117,11 @@ html {
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-ink) 2.5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 2.5%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 ::selection {
@@ -124,25 +129,31 @@ body {
   color: var(--color-paper);
 }
 
-/* the BoxBox display voice: Fraunces at full optical size, tight */
+/* technical display voice */
 .display {
-  font-family: var(--font-serif);
-  font-variation-settings: "opsz" 144;
-  letter-spacing: -0.015em;
+  font-family: var(--font-sans);
+  letter-spacing: -0.045em;
 }
 
-/* newspaper double rule — thick over thin */
+/* legacy class retained; now a calibrated instrument divider */
 .rule-double {
-  border-top: 3px solid var(--color-ink);
+  border-top: 1px solid color-mix(in srgb, var(--color-ink) 28%, transparent);
   position: relative;
 }
 .rule-double::after {
   content: "";
   position: absolute;
-  top: 4px;
+  top: 3px;
   left: 0;
   right: 0;
-  border-top: 1px solid var(--color-ink);
+  border-top: 1px solid color-mix(in srgb, var(--color-ink) 8%, transparent);
+}
+
+.tech-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-ink) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-ink) 5%, transparent) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 /* custom range slider — hairline track, square ink thumb */

@@ -1,80 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { fetchCircuit } from "@/lib/circuits";
-import { makeProjector, toClosedPath, type BakedCircuit } from "@/lib/track/geometry";
 
-const TOOLS = [
-  { href: "/poster", n: "01", title: "Circuit posters", blurb: "Circuit geometry from F1 live-timing coordinates, all 24 rounds. SVG/PNG export." },
-  { href: "/ghost", n: "02", title: "Ghost lab", blurb: "Two laps overlaid at 20 Hz: speed, throttle, brake, gear, DRS, time delta by track position." },
-  { href: "/replay", n: "03", title: "Replay", blurb: "Full-session playback, 20 cars: race order, gaps, flags, pit stops, stints, sector times." },
-  { href: "/numbers", n: "04", title: "The Numbers", blurb: "1950–present in in-browser DuckDB. Teammate head-to-head and what-if points recomputation." },
-  { href: "/recap", n: "05", title: "Recap", blurb: "Per-season driver stats and cumulative points arc vs the title rival. Exportable card." },
-  { href: "/live", n: "06", title: "Live", blurb: "Delayed live positions over SSE, or any past session simulated through the same pipeline." },
+const AREAS = [
+  {
+    href: "/lab",
+    code: "LAB",
+    title: "Technical Lab",
+    blurb: "Inspect sessions, compare drivers, and read race data at source cadence.",
+    tools: [
+      ["Replay", "Synchronized track, order, gaps, events, strategy and telemetry.", "/lab/replay"],
+      ["Ghost", "Fastest-lap overlay with 20 Hz controls and delta trace.", "/lab/ghost"],
+      ["Head to head", "Shared-round teammate analysis from 1950 onward.", "/lab/h2h"],
+    ],
+  },
+  {
+    href: "/studio",
+    code: "STD",
+    title: "Data Studio",
+    blurb: "Compose, recompute and export F1 data as configurable artifacts.",
+    tools: [
+      ["Poster", "Year-aware circuit geometry with editable composition.", "/studio/poster"],
+      ["Scenarios", "Recalculate championships under controlled changes.", "/studio/scenarios"],
+      ["Recap", "Configurable season summaries and comparison arcs.", "/studio/recap"],
+    ],
+  },
 ];
 
-/** Front page: oversized serif headline over a bare ink track line. */
 export default function Home() {
-  const [circuit, setCircuit] = useState<BakedCircuit | null>(null);
-
-  useEffect(() => {
-    fetchCircuit("monza").then(setCircuit).catch(() => {});
-  }, []);
-
-  const track = circuit ? makeProjector(circuit, { x: 10, y: 10, width: 620, height: 420 }).trackScreen : null;
-
   return (
-    <main className="mx-auto max-w-6xl px-5 md:px-8">
-      {/* hero */}
-      <section className="grid items-center gap-10 py-14 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:py-20">
+    <main className="mx-auto max-w-7xl px-5 py-10 md:px-6 md:py-16">
+      <section className="grid min-h-[38vh] content-between border border-ink/15 bg-paper-2/70 p-6 md:grid-cols-[1fr_320px] md:p-10">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.3em] text-red">FORMULA 1 RACE LAB</p>
-          <h1 className="display mt-5 text-[44px] font-black leading-[1.02] md:text-[64px]">
-            Every lap,
-            <br />
-            <span className="font-light italic">every signal.</span>
-          </h1>
-          <p className="mt-6 max-w-md text-[15px] leading-relaxed text-ink-2">
-            Session replays, lap-delta telemetry, circuit geometry and 75 seasons of results —
-            from F1 live-timing data (OpenF1) and F1DB.
+          <div className="font-mono text-[10px] tracking-[0.24em] text-red">FORMULA ONE / DATA SYSTEM</div>
+          <h1 className="display mt-6 max-w-3xl text-5xl font-bold leading-[0.94] md:text-7xl">Read the race.<br />Not the broadcast.</h1>
+          <p className="mt-6 max-w-xl text-[14px] leading-6 text-ink-2">
+            Session telemetry from OpenF1 and historical results from F1DB, separated by capability and exposed without invented precision.
           </p>
         </div>
-        <div className="hidden md:block" aria-hidden>
-          {track ? (
-            <svg viewBox="0 0 640 440" className="w-full">
-              <path d={toClosedPath(track)} fill="none" stroke="var(--color-ink)" strokeWidth={5} strokeLinejoin="round" />
-              <circle cx={track[0][0]} cy={track[0][1]} r={8} fill="var(--color-red)" />
-            </svg>
-          ) : (
-            <div className="aspect-[64/44] w-full" />
-          )}
-        </div>
+        <dl className="mt-10 grid grid-cols-2 gap-px self-end bg-ink/15 font-mono text-[10px] md:mt-0 md:grid-cols-1">
+          {[["TELEMETRY", "2023—NOW"], ["RESULTS", "1950—NOW"], ["POSITION", "~3.7 HZ"], ["LAP DATA", "SESSION NATIVE"]].map(([k, v]) => (
+            <div key={k} className="bg-paper p-3"><dt className="text-ink-3">{k}</dt><dd className="mt-1 text-ink">{v}</dd></div>
+          ))}
+        </dl>
       </section>
 
-      {/* contents */}
-      <section className="pb-10">
-        <div className="rule-double pb-[5px]" />
-        <div className="flex items-baseline justify-between pb-2 pt-3">
-          <h2 className="font-mono text-[11px] tracking-[0.3em] text-ink-3">TOOLS</h2>
-          <span className="font-mono text-[11px] tracking-[0.3em] text-ink-3">06</span>
-        </div>
-        <ol>
-          {TOOLS.map((t) => (
-            <li key={t.href} className="border-t border-ink/15 first:border-t-0">
-              <Link href={t.href} className="group grid gap-1 py-6 md:grid-cols-[80px_minmax(0,5fr)_minmax(0,6fr)_40px] md:items-baseline md:gap-6">
-                <span className="font-mono text-[13px] text-red">{t.n}</span>
-                <span className="display text-[26px] font-bold leading-tight transition-colors group-hover:text-red md:text-[30px]">
-                  {t.title}
-                </span>
-                <span className="text-[13px] leading-relaxed text-ink-2">{t.blurb}</span>
-                <span className="hidden text-right text-[18px] text-ink-3 transition-all group-hover:translate-x-1 group-hover:text-red md:block">
-                  →
-                </span>
+      <section className="mt-6 grid gap-6 md:grid-cols-2">
+        {AREAS.map((area) => (
+          <article key={area.href} className="border border-ink/15 bg-paper">
+            <Link href={area.href} className="block border-b border-ink/15 p-5 hover:bg-paper-2">
+              <div className="font-mono text-[10px] text-red">{area.code} / 03 MODULES</div>
+              <h2 className="mt-3 text-2xl font-semibold">{area.title}</h2>
+              <p className="mt-2 text-[13px] leading-5 text-ink-2">{area.blurb}</p>
+            </Link>
+            {area.tools.map(([title, blurb, href], i) => (
+              <Link key={href} href={href} className="group grid grid-cols-[28px_1fr] gap-3 border-b border-ink/10 p-4 last:border-b-0 hover:bg-paper-2">
+                <span className="font-mono text-[10px] text-ink-3">0{i + 1}</span>
+                <span><strong className="text-[13px] group-hover:text-red">{title}</strong><span className="mt-1 block text-[12px] text-ink-3">{blurb}</span></span>
               </Link>
-            </li>
-          ))}
-        </ol>
+            ))}
+          </article>
+        ))}
       </section>
     </main>
   );

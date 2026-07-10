@@ -1,6 +1,7 @@
 "use client";
 
 import { q } from "./duckdb";
+import { assertSeasonYear } from "@/lib/seasons";
 
 export interface H2HPair {
   constructorId: string;
@@ -20,6 +21,7 @@ export interface H2HPair {
 
 /** Teammate pairings for a season with quali/race head-to-head counts and points. */
 export async function teammateH2H(year: number): Promise<H2HPair[]> {
+  year = assertSeasonYear(year);
   const pairSql = (table: string) => `
     SELECT a.constructorId AS cid, a.driverId AS da, b.driverId AS db,
            SUM(CASE WHEN a.positionNumber < b.positionNumber THEN 1 ELSE 0 END) AS wa,
@@ -85,19 +87,29 @@ export interface SeasonMatrix {
   drivers: { id: string; name: string }[];
   /** points[driverId][round] */
   points: Record<string, Record<number, number>>;
+  /** main-race classified finish used for championship countback */
+  finishes: Record<string, Record<number, number>>;
+  sprintFinishes: Record<string, Record<number, number>>;
   /** published final standings for validation/comparison */
   official: { driverId: string; points: number; position: number }[];
 }
 
 /** Per-round points matrix for the what-if calculator. */
 export async function seasonMatrix(year: number): Promise<SeasonMatrix> {
-  const [cells, roundRows, official, names] = await Promise.all([
+  year = assertSeasonYear(year);
+  const [cells, finishRows, sprintFinishRows, roundRows, official, names] = await Promise.all([
     q<{ driverId: string; round: number; pts: number }>(`
       SELECT driverId, round, SUM(COALESCE(points, 0)) AS pts FROM (
         SELECT driverId, round, points FROM race_results WHERE year = ${year}
         UNION ALL
         SELECT driverId, round, points FROM sprint_results WHERE year = ${year}
       ) GROUP BY 1, 2`),
+    q<{ driverId: string; round: number; position: number }>(`
+      SELECT driverId, round, positionNumber AS position
+      FROM race_results WHERE year = ${year} AND positionNumber IS NOT NULL`),
+    q<{ driverId: string; round: number; position: number }>(`
+      SELECT driverId, round, positionNumber AS position
+      FROM sprint_results WHERE year = ${year} AND positionNumber IS NOT NULL`),
     q<{ round: number; name: string }>(`SELECT round, grandPrixId AS name FROM races WHERE year = ${year} ORDER BY round`),
     q<{ driverId: string; points: number; position: number }>(`
       SELECT driverId, points, positionDisplayOrder AS position FROM season_standings WHERE year = ${year} ORDER BY position`),
@@ -106,15 +118,21 @@ export async function seasonMatrix(year: number): Promise<SeasonMatrix> {
 
   const nameOf = new Map(names.map((r) => [r.id, r.name]));
   const points: SeasonMatrix["points"] = {};
+  const finishes: SeasonMatrix["finishes"] = {};
+  const sprintFinishes: SeasonMatrix["sprintFinishes"] = {};
   for (const c of cells) {
     const d = (points[c.driverId] ??= {});
     d[Number(c.round)] = Number(c.pts);
   }
+  for (const row of finishRows) (finishes[row.driverId] ??= {})[Number(row.round)] = Number(row.position);
+  for (const row of sprintFinishRows) (sprintFinishes[row.driverId] ??= {})[Number(row.round)] = Number(row.position);
   const driverIds = official.length > 0 ? official.map((o) => o.driverId) : Object.keys(points);
   return {
     rounds: roundRows.map((r) => ({ round: Number(r.round), name: r.name })),
     drivers: driverIds.map((id) => ({ id, name: nameOf.get(id) ?? id })),
     points,
+    finishes,
+    sprintFinishes,
     official: official.map((o) => ({ driverId: o.driverId, points: Number(o.points), position: Number(o.position) })),
   };
 }
@@ -143,6 +161,7 @@ export interface RecapData {
 }
 
 export async function seasonDrivers(year: number): Promise<{ id: string; name: string }[]> {
+  year = assertSeasonYear(year);
   return (
     await q<{ id: string; name: string }>(`
       SELECT d.id, d.name FROM season_standings s JOIN drivers d ON d.id = s.driverId
@@ -150,7 +169,8 @@ export async function seasonDrivers(year: number): Promise<{ id: string; name: s
   ).map((r) => ({ id: r.id, name: r.name }));
 }
 
-export async function driverSeasonRecap(year: number, driverId: string): Promise<RecapData> {
+export async function driverSeasonRecap(year: number, driverId: string, rivalId?: string): Promise<RecapData> {
+  year = assertSeasonYear(year);
   const esc = driverId.replace(/'/g, "''");
   const [summary, teams, roundRows, standing, names] = await Promise.all([
     q<{ wins: bigint; podiums: bigint; poles: bigint; flaps: bigint }>(`
@@ -171,14 +191,16 @@ export async function driverSeasonRecap(year: number, driverId: string): Promise
       WHERE r.year = ${year} AND r.driverId = '${esc}' ORDER BY r.round`),
     q<{ driverId: string; position: number; points: number }>(`
       SELECT driverId, positionDisplayOrder AS position, points FROM season_standings
-      WHERE year = ${year} ORDER BY positionDisplayOrder LIMIT 3`),
+      WHERE year = ${year} ORDER BY positionDisplayOrder`),
     q<{ id: string; name: string; firstName: string; lastName: string }>(`
       SELECT id, name, firstName, lastName FROM drivers`),
   ]);
 
   const me = standing.find((s) => s.driverId === driverId);
   // rival = champion, unless you ARE the champion — then the runner-up
-  const rival = standing.find((s) => s.driverId !== driverId) ?? standing[0];
+  const rival = standing.find((s) => s.driverId === rivalId && s.driverId !== driverId)
+    ?? standing.find((s) => s.driverId !== driverId)
+    ?? standing[0];
   const nameOf = new Map(names.map((n) => [n.id, n]));
 
   const rivalRounds = await q<{ round: number; pts: number }>(`

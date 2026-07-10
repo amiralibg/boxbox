@@ -14,6 +14,24 @@ never relitigate them.
 - **Phase 5 (recap generator): DONE.** `/recap` route.
 - **Phase 6 (live mode): DONE.** `/live` route. ALL SPEC PHASES COMPLETE.
 
+## Technical Lab redesign (2026-07, current direction)
+
+- Product IA is now `/lab` (Replay, Ghost, H2H) and `/studio` (Poster,
+  Scenarios, Recap). Legacy URLs redirect. Live was removed from the product
+  and its SSE/feed-specific code deleted; `/live` redirects to Replay.
+- The print-editorial shell below is historical. Current UI is an engineering
+  workstation: Space Grotesk + JetBrains Mono, cool neutral surfaces, compact
+  tabular hierarchy, dark default, functional light theme.
+- Season coverage is capability-aware: OpenF1 telemetry and exact on-demand
+  geometry begin in 2023; F1DB result tools derive their year lists from rows
+  (1950 onward). Never silently claim one common range.
+- Circuit lookup is `(circuitKey, year)`. Exact geometry is fetched/cached
+  server-side when possible; nearest-year fallback must remain labelled.
+- Replay bake v3 is 4 Hz Catmull-Rom with signal-hole spans, interpolated
+  leader/ahead gaps, lapped labels, native overtakes, starting grid, official
+  result and stationary pit duration. Per-driver car telemetry is a separate
+  lazy 2 Hz cached payload.
+
 ## Technical pass (2026-07): dark default + full race viewer
 
 - **Dark ("night") is the default theme.** Toggle labels are DARK / LIGHT

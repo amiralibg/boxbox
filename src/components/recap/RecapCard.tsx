@@ -1,176 +1,158 @@
-import type { RecapData } from "@/lib/db/queries";
+import type { RecapData } from "@/lib/db/recap";
 
 export const CARD_W = 1200;
 export const CARD_H = 675;
 
-const PAPER = "#f6f1e5";
-const INK = "#1c1710";
-const INK_2 = "#5b5442";
-const MUTED = "#8d8470";
-const LINE = "#ddd5bf";
-const RED = "#c8102e";
-const SERIF = "'Fraunces', Georgia, serif";
+const PAPER = "#eef2f1";
+const INK = "#111718";
+const SANS = "'Space Grotesk', sans-serif";
 const MONO = "'JetBrains Mono', monospace";
 
-/**
- * Season recap card, 16:9, print-editorial. Pure self-contained SVG (inline
- * styles only) so the existing ExportLayer can serialize it with the embedded
- * fonts. The title-arc draw-in animation lives in page CSS, not here —
- * exports stay static.
- */
-export function RecapCard({ data, accent }: { data: RecapData; accent: string }) {
-  // ----- title arc geometry -----
-  const chart = { x: 610, y: 120, w: 510, h: 210 };
-  const maxPts = Math.max(1, ...data.arc.map((a) => Math.max(a.self, a.rival)));
-  const n = data.arc.length;
-  const px = (i: number) => chart.x + (n < 2 ? 0 : (chart.w * i) / (n - 1));
-  const py = (v: number) => chart.y + chart.h - (chart.h * v) / maxPts;
-  const line = (pick: (a: RecapData["arc"][number]) => number) =>
-    data.arc.map((a, i) => `${i === 0 ? "M" : "L"}${px(i).toFixed(1)} ${py(pick(a)).toFixed(1)}`).join("");
+export type RecapStatKey = "wins" | "podiums" | "poles" | "points" | "fastestLaps";
 
-  // ----- rounds strip -----
-  const strip = { x: 610, y: 395, w: 510 };
-  const cell = Math.min(24, strip.w / Math.max(1, data.rounds.length));
-  const roundFill = (r: RecapData["rounds"][number]) => {
-    if (!r.classified) return "none";
-    if (r.position === 1) return accent;
-    if (r.position != null && r.position <= 3) return `${accent}77`;
-    if (r.points > 0) return "#aca38b";
-    return "#e5dcc4";
+export interface RecapCardOptions {
+  accent: string;
+  background?: string;
+  ink?: string;
+  visibleStats?: RecapStatKey[];
+  showGrid?: boolean;
+  showArc?: boolean;
+  showRounds?: boolean;
+  showPosition?: boolean;
+  customLabel?: string;
+}
+
+/** Self-contained technical season report for SVG/PNG export. */
+export function RecapCard({
+  data,
+  accent,
+  background = PAPER,
+  ink = INK,
+  visibleStats = ["wins", "podiums", "poles", "points", "fastestLaps"],
+  showGrid = true,
+  showArc = true,
+  showRounds = true,
+  showPosition = true,
+  customLabel,
+}: { data: RecapData } & RecapCardOptions) {
+  const chart = { x: 610, y: 145, w: 500, h: 225 };
+  const maxPoints = Math.max(1, ...data.arc.map((point) => Math.max(point.self, point.rival)));
+  const count = data.arc.length;
+  const px = (index: number) => chart.x + (count < 2 ? 0 : chart.w * index / (count - 1));
+  const py = (value: number) => chart.y + chart.h - chart.h * value / maxPoints;
+  const path = (pick: (point: RecapData["arc"][number]) => number) =>
+    data.arc.map((point, index) => `${index === 0 ? "M" : "L"}${px(index).toFixed(1)} ${py(pick(point)).toFixed(1)}`).join("");
+  const strip = { x: 610, y: 445, w: 500 };
+  const cell = strip.w / Math.max(1, data.rounds.length);
+  const lastSelf = data.arc[count - 1]?.self ?? 0;
+  const lastRival = data.arc[count - 1]?.rival ?? 0;
+  const nameSize = Math.min(76, 390 / Math.max(5, data.lastName.length * 0.55));
+  const labels: Record<RecapStatKey, string> = {
+    wins: "WINS",
+    podiums: "PODIUMS",
+    poles: "POLES",
+    points: "POINTS",
+    fastestLaps: "FASTEST LAPS",
   };
-
-  const stat = (label: string, value: string | number, x: number) => (
-    <g>
-      <text x={x} y={556} fontSize={12} letterSpacing={3} fill={MUTED} fontFamily={MONO}>{label}</text>
-      <text x={x} y={608} fontSize={46} fontWeight={800} fill={INK} fontFamily={SERIF}>{value}</text>
-    </g>
-  );
 
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox={`0 0 ${CARD_W} ${CARD_H}`} width={CARD_W} height={CARD_H}>
-      <rect width={CARD_W} height={CARD_H} fill={PAPER} />
+      <defs>
+        <pattern id="recap-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+          <path d="M24 0H0V24" fill="none" stroke={ink} strokeOpacity={0.045} />
+        </pattern>
+      </defs>
+      <rect width={CARD_W} height={CARD_H} fill={background} />
+      {showGrid && <rect x={36} y={36} width={1128} height={603} fill="url(#recap-grid)" />}
+      <rect x={36} y={36} width={1128} height={603} fill="none" stroke={ink} strokeOpacity={0.22} />
+      <line x1={565} y1={94} x2={565} y2={611} stroke={ink} strokeOpacity={0.18} />
 
-      {/* masthead */}
-      <text x={70} y={72} fontSize={13} letterSpacing={4} fill={INK_2} fontFamily={MONO}>
-        FORMULA 1 · SEASON RECAP
-      </text>
-      <text x={CARD_W - 70} y={72} fontSize={13} letterSpacing={4} fill={INK_2} textAnchor="end" fontFamily={MONO}>
-        {data.year}
-      </text>
-      <rect x={70} y={86} width={CARD_W - 140} height={3} fill={INK} />
-      <line x1={70} y1={94} x2={CARD_W - 70} y2={94} stroke={INK} strokeWidth={1} />
+      <g fontFamily={MONO}>
+        <rect x={36} y={36} width={8} height={58} fill={accent} />
+        <text x={60} y={61} fontSize={11} fontWeight={700} letterSpacing={2.2} fill={ink}>{(customLabel?.trim() || "BB / SEASON PERFORMANCE REPORT").toUpperCase()}</text>
+        <text x={60} y={82} fontSize={8.5} letterSpacing={1.5} fill={ink} opacity={0.48}>DRIVER CHAMPIONSHIP / PUBLISHED RESULTS</text>
+        <text x={1140} y={61} textAnchor="end" fontSize={12} fontWeight={700} fill={accent}>{data.year}</text>
+        <text x={1140} y={82} textAnchor="end" fontSize={8.5} letterSpacing={1.5} fill={ink} opacity={0.48}>F1DB / {String(data.rounds.length).padStart(2, "0")} ROUNDS</text>
+      </g>
+      <line x1={60} y1={110} x2={1140} y2={110} stroke={ink} strokeOpacity={0.2} />
+      <line x1={60} y1={110} x2={244} y2={110} stroke={accent} strokeWidth={3} />
 
-      {/* driver block */}
-      <text x={70} y={186} fontSize={40} fontStyle="italic" fontWeight={300} fill={INK_2} fontFamily={SERIF}>
-        {data.firstName}
-      </text>
-      <text x={70} y={262} fontSize={72} fontWeight={800} fill={INK} fontFamily={SERIF}>
-        {data.lastName.toUpperCase()}
-        <tspan fill={accent}>.</tspan>
-      </text>
-      <rect x={70} y={286} width={56} height={3} fill={accent} />
-      <text x={70} y={326} fontSize={14} letterSpacing={2} fill={MUTED} fontFamily={MONO}>
-        {data.teams.join(" · ").toUpperCase()}
-      </text>
+      <g>
+        <text x={72} y={169} fontFamily={MONO} fontSize={10} letterSpacing={2} fill={ink} opacity={0.48}>DRIVER / {data.driverId.toUpperCase()}</text>
+        <text x={72} y={222} fontFamily={SANS} fontSize={30} fontWeight={400} fill={ink} opacity={0.58}>{data.firstName.toUpperCase()}</text>
+        <text x={68} y={292} fontFamily={SANS} fontSize={nameSize} fontWeight={700} letterSpacing={-2.5} fill={ink}>{data.lastName.toUpperCase()}</text>
+        <rect x={72} y={316} width={74} height={4} fill={accent} />
+        <text x={72} y={350} fontFamily={MONO} fontSize={10} letterSpacing={1.4} fill={ink} opacity={0.52}>{data.teams.join(" / ").toUpperCase()}</text>
 
-      {/* final position, oversized */}
-      {data.finalPosition != null && (
-        <g>
-          <text x={70} y={470} fontSize={120} fontWeight={900} fill={accent} fontFamily={SERIF}>
-            P{data.finalPosition}
-          </text>
-          <text
-            x={78 + (data.finalPosition >= 10 ? 230 : 160)}
-            y={466}
-            fontSize={13}
-            letterSpacing={3}
-            fill={MUTED}
-            fontFamily={MONO}
-          >
-            CHAMPIONSHIP
-          </text>
+        {showPosition && data.finalPosition != null && (
+          <g>
+            <text x={68} y={485} fontFamily={SANS} fontSize={126} fontWeight={700} letterSpacing={-7} fill={accent}>P{data.finalPosition}</text>
+            <text x={75} y={514} fontFamily={MONO} fontSize={9} letterSpacing={2} fill={ink} opacity={0.48}>FINAL CHAMPIONSHIP POSITION</text>
+          </g>
+        )}
+      </g>
+
+      {showArc && (
+        <g fontFamily={MONO}>
+          <text x={chart.x} y={chart.y - 24} fontSize={9} letterSpacing={1.8} fill={accent}>CUMULATIVE POINTS TRACE</text>
+          <text x={chart.x + chart.w} y={chart.y - 24} textAnchor="end" fontSize={8.5} fill={ink} opacity={0.45}>VS {data.rivalName.toUpperCase()}</text>
+          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+            <g key={fraction}>
+              <line x1={chart.x} y1={chart.y + chart.h * fraction} x2={chart.x + chart.w} y2={chart.y + chart.h * fraction} stroke={ink} strokeOpacity={fraction === 1 ? 0.24 : 0.08} />
+              <text x={chart.x - 12} y={chart.y + chart.h * fraction + 3} textAnchor="end" fontSize={7.5} fill={ink} opacity={0.36}>{Math.round(maxPoints * (1 - fraction))}</text>
+            </g>
+          ))}
+          <path d={path((point) => point.rival)} fill="none" stroke={ink} strokeOpacity={0.36} strokeWidth={2} strokeDasharray="6 5" />
+          <path d={path((point) => point.self)} fill="none" stroke={accent} strokeWidth={3} className="rc-arc" />
+          <circle cx={px(count - 1)} cy={py(lastSelf)} r={5} fill={accent} />
+          <circle cx={px(count - 1)} cy={py(lastRival)} r={4} fill={background} stroke={ink} strokeOpacity={0.6} />
+          <text x={chart.x + chart.w - 4} y={py(lastSelf) - 11} textAnchor="end" fontSize={10} fontWeight={700} fill={accent}>{lastSelf}</text>
+          <text x={chart.x + chart.w - 4} y={py(lastRival) + 17} textAnchor="end" fontSize={9} fill={ink} opacity={0.52}>{lastRival}</text>
         </g>
       )}
 
-      {/* title arc */}
-      <g fontFamily={MONO}>
-        <text x={chart.x} y={chart.y - 14} fontSize={12} letterSpacing={3} fill={MUTED}>
-          TITLE ARC — CUMULATIVE POINTS VS {data.rivalName.toUpperCase()}
-        </text>
-        <line x1={chart.x} y1={chart.y + chart.h} x2={chart.x + chart.w} y2={chart.y + chart.h} stroke={LINE} strokeWidth={1} />
-        <path d={line((a) => a.rival)} fill="none" stroke={MUTED} strokeWidth={1.75} strokeDasharray="5 4" opacity={0.8} />
-        <path d={line((a) => a.self)} fill="none" stroke={accent} strokeWidth={2.5} className="rc-arc" />
-        {(() => {
-          const selfV = data.arc[n - 1]?.self ?? 0;
-          const rivalV = data.arc[n - 1]?.rival ?? 0;
-          let ySelf = py(selfV) + 4;
-          let yRival = py(rivalV) + 4;
-          // pull colliding end labels apart
-          if (Math.abs(ySelf - yRival) < 15) {
-            const mid = (ySelf + yRival) / 2;
-            ySelf = mid + (selfV >= rivalV ? -8 : 8);
-            yRival = mid + (selfV >= rivalV ? 8 : -8);
-          }
-          const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
-          return (
-            <>
-              <text x={chart.x + chart.w + 8} y={ySelf} fontSize={13} fontWeight={700} fill={accent}>{fmt(selfV)}</text>
-              <text x={chart.x + chart.w + 8} y={yRival} fontSize={13} fill={MUTED}>{fmt(rivalV)}</text>
-            </>
-          );
-        })()}
-      </g>
+      {showRounds && (
+        <g fontFamily={MONO}>
+          <text x={strip.x} y={strip.y - 18} fontSize={9} letterSpacing={1.8} fill={accent}>ROUND RESULT MATRIX</text>
+          {data.rounds.map((round, index) => {
+            const x = strip.x + index * cell;
+            const classified = round.classified;
+            const opacity = round.position === 1 ? 1 : round.position != null && round.position <= 3 ? 0.58 : round.points > 0 ? 0.25 : 0.08;
+            return (
+              <g key={round.round}>
+                <rect x={x} y={strip.y} width={Math.max(2, cell - 3)} height={36} fill={classified ? accent : "none"} fillOpacity={opacity} stroke={classified ? ink : accent} strokeOpacity={classified ? 0.14 : 0.8} />
+                {!classified && <path d={`M${x + 3} ${strip.y + 3}L${x + cell - 6} ${strip.y + 33}M${x + cell - 6} ${strip.y + 3}L${x + 3} ${strip.y + 33}`} stroke={accent} />}
+                {(index === 0 || round.round % 5 === 0) && <text x={x} y={strip.y + 52} fontSize={7.5} fill={ink} opacity={0.42}>R{round.round}</text>}
+              </g>
+            );
+          })}
+          <g transform={`translate(${strip.x} ${strip.y + 78})`} fontSize={8} fill={ink} opacity={0.5}>
+            <rect width={9} height={9} fill={accent} opacity={1} /><text x={15} y={8}>WIN</text>
+            <rect x={58} width={9} height={9} fill={accent} opacity={0.58} /><text x={73} y={8}>PODIUM</text>
+            <rect x={150} width={9} height={9} fill={accent} opacity={0.25} /><text x={165} y={8}>POINTS</text>
+            <rect x={238} width={9} height={9} fill="none" stroke={accent} /><text x={253} y={8}>DNF / DNS</text>
+          </g>
+        </g>
+      )}
 
-      {/* rounds strip */}
-      <g fontFamily={MONO}>
-        <text x={strip.x} y={strip.y - 12} fontSize={12} letterSpacing={3} fill={MUTED}>
-          ROUND BY ROUND
-        </text>
-        {data.rounds.map((r, i) => {
-          const x = strip.x + i * cell;
-          const fill = roundFill(r);
+      <g transform="translate(60 557)">
+        {visibleStats.map((key, index) => {
+          const width = 490 / visibleStats.length;
+          const x = index * width;
           return (
-            <g key={r.round}>
-              {fill === "none" ? (
-                <g stroke={RED} strokeWidth={1.5}>
-                  <line x1={x + 3} y1={strip.y + 3} x2={x + cell - 9} y2={strip.y + cell - 9} />
-                  <line x1={x + cell - 9} y1={strip.y + 3} x2={x + 3} y2={strip.y + cell - 9} />
-                </g>
-              ) : (
-                <rect x={x} y={strip.y} width={cell - 6} height={cell - 6} fill={fill} />
-              )}
-              {(i === 0 || (r.round % 5 === 0 && i > 1)) && (
-                <text x={x} y={strip.y + cell + 12} fontSize={10} fill={MUTED}>R{r.round}</text>
-              )}
+            <g key={key} transform={`translate(${x} 0)`}>
+              {index > 0 && <line y1={0} y2={52} stroke={ink} strokeOpacity={0.15} />}
+              <text x={index > 0 ? 16 : 0} y={10} fontFamily={MONO} fontSize={7.5} letterSpacing={1.2} fill={ink} opacity={0.46}>{labels[key]}</text>
+              <text x={index > 0 ? 16 : 0} y={47} fontFamily={SANS} fontSize={28} fontWeight={650} fill={ink}>{data[key]}</text>
             </g>
           );
         })}
-        <g fontSize={11} fill={MUTED}>
-          <rect x={strip.x} y={strip.y + 44} width={10} height={10} fill={accent} />
-          <text x={strip.x + 16} y={strip.y + 53}>WIN</text>
-          <rect x={strip.x + 60} y={strip.y + 44} width={10} height={10} fill={`${accent}77`} />
-          <text x={strip.x + 76} y={strip.y + 53}>PODIUM</text>
-          <rect x={strip.x + 150} y={strip.y + 44} width={10} height={10} fill="#aca38b" />
-          <text x={strip.x + 166} y={strip.y + 53}>POINTS</text>
-          <text x={strip.x + 238} y={strip.y + 53} fill={RED}>✕ DNF</text>
-        </g>
       </g>
 
-      {/* stats row */}
-      {stat("WINS", data.wins, 70)}
-      {stat("PODIUMS", data.podiums, 210)}
-      {stat("POLES", data.poles, 390)}
-      {stat("POINTS", data.points, 530)}
-      {stat("FASTEST LAPS", data.fastestLaps, 730)}
-
-      {/* footer */}
-      <line x1={70} y1={628} x2={CARD_W - 70} y2={628} stroke={LINE} strokeWidth={1} />
-      <text x={70} y={652} fontSize={16} fontWeight={800} fill={INK} fontFamily={SERIF}>
-        BoxBox<tspan fill={accent}>.</tspan>
-      </text>
-      <text x={CARD_W - 70} y={650} fontSize={10} letterSpacing={2} fill={MUTED} textAnchor="end" fontFamily={MONO}>
-        DATA · F1DB
-      </text>
+      <g fontFamily={MONO}>
+        <text x={590} y={617} fontSize={8} letterSpacing={1.3} fill={ink} opacity={0.4}>COMPARISON / {data.rivalName.toUpperCase()}</text>
+        <text x={1140} y={617} textAnchor="end" fontSize={8} letterSpacing={1.3} fill={ink} opacity={0.4}>BOXBOX DATA STUDIO / F1DB</text>
+      </g>
     </svg>
   );
 }

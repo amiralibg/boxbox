@@ -8,7 +8,7 @@
  *
  *   pnpm exec tsx scripts/bake-circuits.ts [year]
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const YEAR = Number(process.argv[2] ?? 2025);
@@ -52,7 +52,13 @@ async function main() {
   console.log(`${YEAR}: ${circuits.size} circuits`);
 
   await mkdir(OUT_DIR, { recursive: true });
-  const index: object[] = [];
+  let index: Array<{ circuitKey: number; year: number; [key: string]: unknown }> = [];
+  try {
+    index = JSON.parse(await readFile(path.join(OUT_DIR, "index.json"), "utf8"));
+  } catch {
+    // first bake
+  }
+  index = index.filter((entry) => entry.year !== YEAR);
 
   for (const s of circuits.values()) {
     await sleep(PAUSE_MS);
@@ -63,7 +69,7 @@ async function main() {
       continue;
     }
     const mv = (await r.json()) as MvCircuit;
-    const slug = slugify(s.circuit_short_name);
+    const slug = `${slugify(s.circuit_short_name)}-${YEAR}`;
 
     const baked = {
       slug,
@@ -99,6 +105,7 @@ async function main() {
     console.log(`baked ${slug} (${baked.x.length} pts, ${baked.corners.length} corners, rot ${baked.rotation}°)`);
   }
 
+  index.sort((a, b) => b.year - a.year);
   await writeFile(path.join(OUT_DIR, "index.json"), JSON.stringify(index, null, 2));
   console.log(`wrote index.json (${index.length} circuits)`);
 }

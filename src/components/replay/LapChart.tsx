@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import { lapAtTime, lapStartTimes } from "@/lib/replay/derive";
-import { orderAt, type ReplayBlob } from "@/lib/replay/types";
+import type { ReplayBlob } from "@/lib/replay/types";
 import type { TelemetryPlayer } from "@/lib/telemetry/player";
 import { chartPalette, useTheme } from "@/lib/theme";
 
@@ -36,26 +36,21 @@ export function LapChart({
     if (!host) return;
     const pal = chartPalette();
     const starts = lapStartTimes(blob.laps);
-    const maxLap = starts.length - 1;
+    const maxLap = Math.max(0, ...Object.values(blob.laps).flat().map((lap) => lap.lap));
     if (maxLap < 2) return;
 
-    // walk the order events once, sampling each driver's position at each
-    // lap start — orderAt() per (driver, lap) would rescan the event list
     const lapAxis = Array.from({ length: maxLap }, (_, i) => i + 1);
     const series = new Map<number, (number | null)[]>(blob.drivers.map((d) => [d.num, Array(maxLap).fill(null)]));
-    let ei = 0;
-    const posNow = new Map<number, number>();
-    for (let lap = 1; lap <= maxLap; lap++) {
-      const t = starts[lap];
-      if (Number.isNaN(t)) continue;
-      while (ei < blob.order.length && blob.order[ei].t <= t) {
-        posNow.set(blob.order[ei].num, blob.order[ei].pos);
-        ei++;
-      }
-      for (const d of blob.drivers) {
-        // only plot laps the driver actually ran
-        if (!blob.laps[d.num]?.some((l) => l.lap === lap)) continue;
-        series.get(d.num)![lap - 1] = posNow.get(d.num) ?? null;
+    for (const driver of blob.drivers) {
+      const events = blob.order.filter((event) => event.num === driver.num);
+      for (const lap of blob.laps[driver.num] ?? []) {
+        if (lap.tStart == null) continue;
+        let position: number | null = null;
+        for (const event of events) {
+          if (event.t > lap.tStart) break;
+          position = event.pos;
+        }
+        series.get(driver.num)![lap.lap - 1] = position;
       }
     }
 

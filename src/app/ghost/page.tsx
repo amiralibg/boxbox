@@ -9,14 +9,15 @@ import { Select } from "@/components/ui/Select";
 import { SegmentStrip, TimingTable, TyreChip, type TimingRow } from "@/components/ui/TimingTable";
 import { distinctPair, teamColor } from "@/lib/color";
 import { useTheme } from "@/lib/theme";
-import { fetchCircuit, fetchCircuitIndex } from "@/lib/circuits";
+import { fetchResolvedCircuit } from "@/lib/circuits";
 import { buildDeltaProfile, deltaAt } from "@/lib/telemetry/delta";
 import { TelemetryPlayer } from "@/lib/telemetry/player";
 import { sampleLap } from "@/lib/telemetry/sample";
 import type { BakedCircuit } from "@/lib/track/geometry";
 import type { BakedLap, DriverInfo, SessionInfo } from "@/lib/telemetry/types";
+import { openF1SeasonCatalog } from "@/lib/seasons";
 
-const YEARS = [2023, 2024, 2025, 2026];
+const YEARS = openF1SeasonCatalog().map((entry) => entry.year);
 
 const fmtLap = (s: number) => {
   const m = Math.floor(s / 60);
@@ -32,7 +33,7 @@ async function getJson<T>(url: string): Promise<T> {
 
 export default function GhostPage() {
   const theme = useTheme();
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(YEARS[0]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetingKey, setMeetingKey] = useState<number | null>(null);
   const [sessionKey, setSessionKey] = useState<number | null>(null);
@@ -43,6 +44,7 @@ export default function GhostPage() {
   const [circuit, setCircuit] = useState<BakedCircuit | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geometryNote, setGeometryNote] = useState<string | null>(null);
 
   useEffect(() => {
     setSessions([]);
@@ -80,16 +82,14 @@ export default function GhostPage() {
     setError(null);
     setLaps(null);
     (async () => {
-      const index = await fetchCircuitIndex();
-      const entry = index.find((c) => c.circuitKey === session.circuit_key);
-      if (!entry) throw new Error(`no baked geometry for circuit ${session.circuit_short_name}`);
-      const [circ, a, b] = await Promise.all([
-        fetchCircuit(entry.slug),
+      const [resolved, a, b] = await Promise.all([
+        fetchResolvedCircuit(session.circuit_key, session.year),
         getJson<BakedLap>(`/api/fastlap?session_key=${sessionKey}&driver_number=${numA}`),
         getJson<BakedLap>(`/api/fastlap?session_key=${sessionKey}&driver_number=${numB}`),
       ]);
       if (stale) return;
-      setCircuit(circ);
+      setCircuit(resolved.circuit);
+      setGeometryNote(resolved.resolution.exact ? null : `Track geometry: ${resolved.resolution.entry.year} layout (exact ${session.year} layout unavailable)`);
       setLaps({ a, b });
     })()
       .catch((e) => !stale && setError(String(e)))
@@ -116,7 +116,7 @@ export default function GhostPage() {
 
   return (
     <main className="mx-auto max-w-7xl px-5 py-8 md:px-6 md:py-10">
-      <PageTitle index="02" title="Ghost lab" sub="Two fastest laps overlaid: 20 Hz telemetry, time delta by lap fraction, sectors and minisectors." />
+      <PageTitle index="LAB / LAP.02" title="Ghost comparison" sub="Two fastest laps overlaid at 20 Hz. Delta is matched by lap fraction; source channels remain visible by distance." />
 
       <Panel className="mt-6 p-4 md:p-5">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
@@ -176,6 +176,7 @@ export default function GhostPage() {
       {error && (
         <div className="mt-4 border border-red/30 bg-red/5 px-4 py-3 text-[13px] text-red-deep">{error}</div>
       )}
+      {geometryNote && <div className="mt-4 border border-ochre/30 bg-ochre/5 px-4 py-3 font-mono text-[10px] text-ochre">{geometryNote}</div>}
 
       {loading && !laps && <StageSkeleton label="FASTEST LAPS" note="RESAMPLING TELEMETRY" sidebarRows={6} />}
 
@@ -240,8 +241,8 @@ function GhostStage({ circuit, lapA, lapB, driverA, driverB, colorA, colorB }: {
 
   const ghosts: GhostEntry[] = useMemo(
     () => [
-      { lap: lapA, color: colorA, label: driverA.name_acronym },
-      { lap: lapB, color: colorB, label: driverB.name_acronym },
+      { lap: lapA, color: colorA, label: `${driverA.name_acronym} · #${driverA.driver_number} · ${driverA.full_name}` },
+      { lap: lapB, color: colorB, label: `${driverB.name_acronym} · #${driverB.driver_number} · ${driverB.full_name}` },
     ],
     [lapA, lapB, colorA, colorB, driverA, driverB],
   );

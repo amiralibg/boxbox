@@ -9,7 +9,7 @@ import { seasonMatrix, teammateH2H, type H2HPair, type SeasonMatrix } from "@/li
 
 const A = "var(--color-red)";
 const B = "var(--color-blue)";
-const YEARS = Array.from({ length: 2026 - 1950 + 1 }, (_, i) => 2026 - i);
+const YEARS = Array.from({ length: new Date().getUTCFullYear() - 1950 + 1 }, (_, i) => new Date().getUTCFullYear() - i);
 const YEAR_OPTIONS = YEARS.map((y) => ({ value: String(y), label: String(y) }));
 
 const pretty = (slug: string) => slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
@@ -81,7 +81,7 @@ function SplitBar({ a, b }: { a: number; b: number }) {
   );
 }
 
-function H2HTab() {
+export function H2HTab() {
   const [year, setYear] = useState(2025);
   const [pairs, setPairs] = useState<H2HPair[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,19 +137,32 @@ interface Dnf {
   round: number;
 }
 
-function WhatIfTab() {
+interface PointsPenalty {
+  driverId: string;
+  points: number;
+}
+
+const CURRENT_RACE_POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const CURRENT_SPRINT_POINTS = [8, 7, 6, 5, 4, 3, 2, 1];
+
+export function WhatIfTab({ years = YEARS }: { years?: number[] } = {}) {
   const [year, setYear] = useState(2021);
   const [matrix, setMatrix] = useState<SeasonMatrix | null>(null);
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
   const [dnfs, setDnfs] = useState<Dnf[]>([]);
   const [dnfDriver, setDnfDriver] = useState("");
   const [dnfRound, setDnfRound] = useState(0);
+  const [scoring, setScoring] = useState<"published" | "current">("published");
+  const [penalties, setPenalties] = useState<PointsPenalty[]>([]);
+  const [penaltyDriver, setPenaltyDriver] = useState("");
+  const [penaltyPoints, setPenaltyPoints] = useState(10);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setMatrix(null);
     setExcluded(new Set());
     setDnfs([]);
+    setPenalties([]);
     seasonMatrix(year).then(setMatrix).catch((e) => setError(String(e)));
   }, [year]);
 
@@ -158,19 +171,37 @@ function WhatIfTab() {
     const dnfSet = new Set(dnfs.map((d) => `${d.driverId}|${d.round}`));
     const totals = matrix.drivers.map((d) => {
       let pts = 0;
-      const perRound = matrix.points[d.id] ?? {};
-      for (const [roundStr, p] of Object.entries(perRound)) {
-        const round = Number(roundStr);
+      for (const roundRow of matrix.rounds) {
+        const round = roundRow.round;
         if (excluded.has(round)) continue;
         if (dnfSet.has(`${d.id}|${round}`)) continue;
-        pts += p;
+        if (scoring === "published") {
+          pts += matrix.points[d.id]?.[round] ?? 0;
+        } else {
+          const racePosition = matrix.finishes[d.id]?.[round];
+          const sprintPosition = matrix.sprintFinishes[d.id]?.[round];
+          pts += racePosition ? CURRENT_RACE_POINTS[racePosition - 1] ?? 0 : 0;
+          pts += sprintPosition ? CURRENT_SPRINT_POINTS[sprintPosition - 1] ?? 0 : 0;
+        }
       }
-      return { id: d.id, name: d.name, pts };
+      pts -= penalties.filter((penalty) => penalty.driverId === d.id).reduce((sum, penalty) => sum + penalty.points, 0);
+      const countback = Array(30).fill(0) as number[];
+      for (const [roundStr, position] of Object.entries(matrix.finishes[d.id] ?? {})) {
+        const round = Number(roundStr);
+        if (!excluded.has(round) && !dnfSet.has(`${d.id}|${round}`) && position > 0 && position <= countback.length) countback[position - 1]++;
+      }
+      return { id: d.id, name: d.name, pts, countback };
     });
-    totals.sort((a, b) => b.pts - a.pts);
+    totals.sort((a, b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      for (let position = 0; position < a.countback.length; position++) {
+        if (b.countback[position] !== a.countback[position]) return b.countback[position] - a.countback[position];
+      }
+      return 0;
+    });
     const officialPos = new Map(matrix.official.map((o) => [o.driverId, o.position]));
     return totals.map((t, i) => ({ ...t, pos: i + 1, delta: (officialPos.get(t.id) ?? 99) - (i + 1) }));
-  }, [matrix, excluded, dnfs]);
+  }, [matrix, excluded, dnfs, scoring, penalties]);
 
   const toggleRound = (round: number) =>
     setExcluded((prev) => {
@@ -179,12 +210,26 @@ function WhatIfTab() {
       return next;
     });
 
-  const modified = excluded.size > 0 || dnfs.length > 0;
+  const modified = excluded.size > 0 || dnfs.length > 0 || penalties.length > 0 || scoring !== "published";
+
+  const exportStandings = () => {
+    const csv = ["position,driver,points,change", ...standings.map((row) => `${row.pos},"${row.name.replaceAll('"', '""')}",${row.pts},${row.delta}`)].join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `boxbox-scenario-${year}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="mt-6">
       <div className="flex flex-wrap items-end gap-3">
-        <Select label="SEASON" className="w-32" value={String(year)} onValueChange={(v) => setYear(Number(v))} options={YEAR_OPTIONS} />
+        <Select label="SEASON" className="w-32" value={String(year)} onValueChange={(v) => setYear(Number(v))} options={years.map((y) => ({ value: String(y), label: String(y) }))} />
+        <Select label="SCORING" className="w-48" value={scoring} onValueChange={(value) => setScoring(value as "published" | "current")} options={[
+          { value: "published", label: "Published season" },
+          { value: "current", label: "Current 25–18–15" },
+        ]} />
         {matrix && (
           <>
             <Select
@@ -215,11 +260,32 @@ function WhatIfTab() {
             >
               Add DNF
             </button>
+            <Select
+              label="POINTS PENALTY"
+              className="w-44"
+              value={penaltyDriver || null}
+              onValueChange={setPenaltyDriver}
+              placeholder="Driver…"
+              options={matrix.drivers.map((d) => ({ value: d.id, label: d.name }))}
+            />
+            <label className="text-[10px] tracking-[0.12em] text-ink-3">
+              POINTS
+              <input type="number" min="1" value={penaltyPoints} onChange={(event) => setPenaltyPoints(Math.max(1, Number(event.target.value)))} className="mt-1 block h-10 w-20 border border-ink/20 bg-paper px-2 font-mono text-[12px] text-ink" />
+            </label>
+            <button disabled={!penaltyDriver} onClick={() => {
+              setPenalties((current) => [...current, { driverId: penaltyDriver, points: penaltyPoints }]);
+              setPenaltyDriver("");
+            }} className="h-10 border border-ochre/40 px-3 text-[12px] text-ochre disabled:opacity-40">
+              Apply penalty
+            </button>
+            <button onClick={exportStandings} className="h-10 border border-ink/25 px-3 text-[12px] text-ink-2 hover:text-ink">Export CSV</button>
             {modified && (
               <button
                 onClick={() => {
                   setExcluded(new Set());
                   setDnfs([]);
+                  setPenalties([]);
+                  setScoring("published");
                 }}
                 className="h-10 border border-ink/25 px-4 text-[13px] text-ink-2 transition-colors hover:border-ink/60 hover:text-ink"
               >
@@ -274,6 +340,18 @@ function WhatIfTab() {
                 </div>
               </div>
             )}
+            {penalties.length > 0 && (
+              <div className="mt-6">
+                <SectionLabel accent="var(--color-ochre)">POINTS PENALTIES</SectionLabel>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {penalties.map((penalty, index) => (
+                    <button key={`${penalty.driverId}-${index}`} onClick={() => setPenalties((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="border border-ochre/40 bg-ochre/10 px-2.5 py-1.5 text-[12px] text-ochre">
+                      {matrix.drivers.find((driver) => driver.id === penalty.driverId)?.name} −{penalty.points} pts ✕
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <Panel>
@@ -304,7 +382,7 @@ function WhatIfTab() {
               </div>
             ))}
             <div className="px-4 py-3 text-[11px] leading-relaxed text-ink-3">
-              Points only — championship countback (win counts) not modelled; ties keep original standings order.
+              Equal points are ordered by race-finish countback: wins, then second places, then subsequent finishes.
             </div>
           </Panel>
         </div>

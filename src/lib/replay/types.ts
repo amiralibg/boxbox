@@ -16,6 +16,7 @@ export interface ReplayBlob {
   sessionKey: number;
   sessionName: string;
   circuitKey: number;
+  sessionYear?: number;
   /** ISO session start; t=0 everywhere below */
   t0: string;
   /** seconds covered by the grids */
@@ -23,12 +24,16 @@ export interface ReplayBlob {
   hz: number;
   drivers: ReplayDriver[];
   /** per driver: x/y int arrays, length duration*hz+1 */
-  pos: Record<number, { x: number[]; y: number[]; lastT: number }>;
+  pos: Record<number, { x: number[]; y: number[]; lastT: number; missing?: [number, number][] }>;
   /** sparse race-order changes, ascending t */
   order: { t: number; num: number; pos: number }[];
   /** per driver gap to leader (s) on gapGrid; null = no data / lapped */
   gapHz: number;
   gaps: Record<number, (number | null)[]>;
+  /** gap to the car ahead on the same grid */
+  intervals?: Record<number, (number | null)[]>;
+  /** lapped gap labels preserved from OpenF1 instead of discarded */
+  lapGaps?: Record<number, { t: number; label: string }[]>;
   /** tyre stints per driver, chronological */
   stints: Record<number, { compound: string | null; lapStart: number; lapEnd: number; tyreAge: number | null }[]>;
   /** every lap per driver, chronological */
@@ -36,11 +41,28 @@ export interface ReplayBlob {
   /** race-control messages (flags, SC/VSC, investigations), ascending t */
   raceControl: RaceControlEvent[];
   /** pit-lane visits per driver: lap, entry time, pit-lane duration */
-  pits: Record<number, { lap: number; t: number; durationS: number | null }[]>;
+  pits: Record<number, { lap: number; t: number; durationS: number | null; stopDurationS?: number | null }[]>;
   /** weather samples (~1/min), ascending t */
   weather: WeatherSample[];
   /** team-radio clips per driver (URLs only; playback UI comes later) */
   radio: Record<number, { t: number; url: string }[]>;
+  /** official/native channels; optional for older OpenF1 sessions */
+  overtakes?: { t: number; overtaking: number; overtaken: number; position: number | null }[];
+  startingGrid?: { num: number; pos: number; lapDuration: number | null }[];
+  result?: { num: number; pos: number | null; status: string | null; points: number | null }[];
+}
+
+export interface ReplayTelemetry {
+  sessionKey: number;
+  driverNumber: number;
+  hz: number;
+  t: number[];
+  speed: number[];
+  throttle: number[];
+  brake: number[];
+  rpm: number[];
+  gear: number[];
+  drs: number[];
 }
 
 export interface RaceControlEvent {
@@ -102,6 +124,31 @@ export function orderAt(events: ReplayBlob["order"], t: number): Map<number, num
 }
 
 export function gapAt(gaps: (number | null)[], gapHz: number, t: number): number | null {
-  const i = Math.min(Math.max(0, Math.round(t * gapHz)), gaps.length - 1);
-  return gaps[i] ?? null;
+  if (gaps.length === 0) return null;
+  const f = Math.max(0, Math.min(t * gapHz, gaps.length - 1));
+  const i = Math.floor(f);
+  const j = Math.min(i + 1, gaps.length - 1);
+  const a = gaps[i];
+  const b = gaps[j];
+  if (a == null) return b ?? null;
+  if (b == null) return a;
+  return a + (b - a) * (f - i);
+}
+
+export function lapGapAt(events: { t: number; label: string }[] | undefined, t: number): string | null {
+  if (!events?.length) return null;
+  let value: string | null = null;
+  for (const event of events) {
+    if (event.t > t) break;
+    value = event.label;
+  }
+  return value;
+}
+
+export function positionIsStale(
+  ch: { lastT: number; missing?: [number, number][] },
+  t: number,
+): boolean {
+  if (t > ch.lastT + 6) return true;
+  return (ch.missing ?? []).some(([start, end]) => t > start && t < end);
 }
